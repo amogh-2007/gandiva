@@ -23,6 +23,50 @@ from backend import SimulationController
 # POPUP WINDOWS
 # =============================================================================
 
+class HailVesselDialog(QDialog):
+    """Popup for hailing a vessel and seeing its response."""
+    def __init__(self, vessel_type, hail_message, response_message, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"Hailing: {vessel_type}")
+        self.setGeometry(400, 400, 500, 250)
+        self.setStyleSheet("QDialog { background-color: #0a192f; }")
+
+        layout = QVBoxLayout()
+        layout.setSpacing(15)
+
+        title = QLabel("COMMUNICATION CHANNEL OPEN")
+        title.setStyleSheet("""
+            font-size: 14px; font-weight: bold; color: #64ffda; letter-spacing: 2px;
+            padding: 10px; background-color: #112240; border: 1px solid #64ffda;
+        """)
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+        
+        hail_label = QLabel(f"OUTGOING HAIL:\n> {hail_message}")
+        hail_label.setWordWrap(True)
+        hail_label.setStyleSheet("font-size: 11px; color: #8892b0;")
+        layout.addWidget(hail_label)
+        
+        response_label = QLabel(f"INCOMING RESPONSE:\n> {response_message}")
+        response_label.setWordWrap(True)
+        response_label.setStyleSheet("font-size: 12px; color: #ccd6f6; font-weight: bold;")
+        layout.addWidget(response_label)
+        
+        layout.addStretch()
+
+        close_btn = QPushButton("CLOSE CHANNEL")
+        close_btn.setStyleSheet("""
+            QPushButton {
+                font-size: 12px; padding: 8px; background-color: #64ffda;
+                color: #0a192f; border: none; border-radius: 3px; font-weight: bold;
+            }
+            QPushButton:hover { background-color: #57d8c0; }
+        """)
+        close_btn.clicked.connect(self.accept)
+        layout.addWidget(close_btn)
+        
+        self.setLayout(layout)
+
 class StatusLogWindow(QDialog):
     """Status log window showing mission events"""
     def __init__(self, controller, parent=None):
@@ -30,14 +74,14 @@ class StatusLogWindow(QDialog):
         self.controller = controller
         self.setWindowTitle("Status Log")
         self.setGeometry(200, 200, 600, 400)
-        self.setStyleSheet("QDialog { background-color: #0a0e1a; }")
+        self.setStyleSheet("QDialog { background-color: #0a192f; }")
 
         layout = QVBoxLayout()
 
         title = QLabel("MISSION STATUS LOG")
         title.setStyleSheet("""
-            font-size: 16px; font-weight: bold; color: #00ff41; letter-spacing: 2px;
-            padding: 10px; background-color: #1a1f2e; border: 1px solid #00ff41;
+            font-size: 16px; font-weight: bold; color: #64ffda; letter-spacing: 2px;
+            padding: 10px; background-color: #112240; border: 1px solid #64ffda;
         """)
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
@@ -46,9 +90,9 @@ class StatusLogWindow(QDialog):
         self.log_text.setReadOnly(True)
         self.log_text.setStyleSheet("""
             QTextEdit {
-                background-color: #0d1117; color: #00ff41;
+                background-color: #0a192f; color: #64ffda;
                 font-family: 'Courier New', monospace; font-size: 11px;
-                border: 2px solid #00ff41; padding: 10px;
+                border: 2px solid #64ffda; padding: 10px;
             }
         """)
         layout.addWidget(self.log_text)
@@ -56,10 +100,10 @@ class StatusLogWindow(QDialog):
         close_btn = QPushButton("CLOSE")
         close_btn.setStyleSheet("""
             QPushButton {
-                font-size: 12px; padding: 8px; background-color: #00ff41;
-                color: #0a0e1a; border: none; border-radius: 3px; font-weight: bold;
+                font-size: 12px; padding: 8px; background-color: #64ffda;
+                color: #0a192f; border: none; border-radius: 3px; font-weight: bold;
             }
-            QPushButton:hover { background-color: #00cc33; }
+            QPushButton:hover { background-color: #57d8c0; }
         """)
         close_btn.clicked.connect(self.close)
         layout.addWidget(close_btn)
@@ -85,14 +129,14 @@ class CommunicateWindow(QDialog):
         self.controller = controller
         self.setWindowTitle("Communications Link")
         self.setGeometry(200, 200, 700, 500)
-        self.setStyleSheet("QDialog { background-color: #0a0e1a; }")
+        self.setStyleSheet("QDialog { background-color: #0a192f; }")
 
         layout = QVBoxLayout()
 
         title = QLabel("NEARBY VESSELS")
         title.setStyleSheet("""
-            font-size: 16px; font-weight: bold; color: #00ff41; letter-spacing: 2px;
-            padding: 10px; background-color: #1a1f2e; border: 1px solid #00ff41;
+            font-size: 16px; font-weight: bold; color: #64ffda; letter-spacing: 2px;
+            padding: 10px; background-color: #112240; border: 1px solid #64ffda;
         """)
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
@@ -102,16 +146,16 @@ class CommunicateWindow(QDialog):
         self.table.setHorizontalHeaderLabels(["Vessel Type", "Distance (m)", "Threat Level", "Speed (kts)", "Heading (°)"])
         self.table.setStyleSheet("""
             QTableWidget {
-                background-color: #0d1117; color: #00ff41;
+                background-color: #0a192f; color: #64ffda;
                 font-family: 'Courier New', monospace; font-size: 11px;
-                border: 2px solid #00ff41; gridline-color: #00ff41;
+                border: 2px solid #64ffda; gridline-color: #64ffda;
             }
             QHeaderView::section {
-                background-color: #1a1f2e; color: #00ff41; font-weight: bold;
-                padding: 5px; border: 1px solid #00ff41;
+                background-color: #112240; color: #64ffda; font-weight: bold;
+                padding: 5px; border: 1px solid #64ffda;
             }
-            QTableWidget::item { padding: 5px; }
-            QTableWidget::item:selected { background-color: #2a3f3e; }
+            QTableWidget::item { padding: 5px; color: #ccd6f6 }
+            QTableWidget::item:selected { background-color: #1d3b53; }
         """)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.table)
@@ -121,10 +165,10 @@ class CommunicateWindow(QDialog):
         contact_button = QPushButton("CONTACT SELECTED VESSEL")
         contact_button.setStyleSheet("""
             QPushButton {
-                font-size: 12px; padding: 8px; background-color: #1a4d1a;
-                color: #00ff41; border: 2px solid #00ff41; border-radius: 3px; font-weight: bold;
+                font-size: 12px; padding: 8px; background-color: #1d3b53;
+                color: #64ffda; border: 2px solid #64ffda; border-radius: 3px; font-weight: bold;
             }
-            QPushButton:hover { background-color: #2a5d2a; }
+            QPushButton:hover { background-color: #2c4a63; }
         """)
         btn_layout.addWidget(contact_button)
 
@@ -132,10 +176,10 @@ class CommunicateWindow(QDialog):
         close_btn = QPushButton("CLOSE")
         close_btn.setStyleSheet("""
             QPushButton {
-                font-size: 12px; padding: 8px; background-color: #00ff41;
-                color: #0a0e1a; border: none; border-radius: 3px; font-weight: bold;
+                font-size: 12px; padding: 8px; background-color: #64ffda;
+                color: #0a192f; border: none; border-radius: 3px; font-weight: bold;
             }
-            QPushButton:hover { background-color: #00cc33; }
+            QPushButton:hover { background-color: #57d8c0; }
         """)
         close_btn.clicked.connect(self.close)
         btn_layout.addWidget(close_btn)
@@ -154,13 +198,13 @@ class CommunicateWindow(QDialog):
 
             threat_item = QTableWidgetItem(ship['threat_level'].upper())
             if ship['threat_level'] == 'confirmed':
-                threat_item.setForeground(QColor(255, 0, 0))
+                threat_item.setForeground(QColor(255, 70, 70))
             elif ship['threat_level'] == 'possible':
                 threat_item.setForeground(QColor(255, 255, 255))
             elif ship['threat_level'] == 'neutral':
-                threat_item.setForeground(QColor(0, 255, 65))
+                threat_item.setForeground(QColor(100, 255, 218))
             else:
-                threat_item.setForeground(QColor(128, 128, 128))
+                threat_item.setForeground(QColor(136, 146, 176))
             self.table.setItem(i, 2, threat_item)
 
             self.table.setItem(i, 3, QTableWidgetItem(f"{ship['speed']:.1f}"))
@@ -173,14 +217,14 @@ class StatusReportWindow(QDialog):
         self.controller = controller
         self.setWindowTitle("Status Report")
         self.setGeometry(300, 300, 500, 400)
-        self.setStyleSheet("QDialog { background-color: #0a0e1a; }")
+        self.setStyleSheet("QDialog { background-color: #0a192f; }")
 
         layout = QVBoxLayout()
 
         title = QLabel("SYSTEM STATUS REPORT")
         title.setStyleSheet("""
-            font-size: 16px; font-weight: bold; color: #00ff41; letter-spacing: 2px;
-            padding: 10px; background-color: #1a1f2e; border: 1px solid #00ff41;
+            font-size: 16px; font-weight: bold; color: #64ffda; letter-spacing: 2px;
+            padding: 10px; background-color: #112240; border: 1px solid #64ffda;
         """)
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
@@ -189,9 +233,9 @@ class StatusReportWindow(QDialog):
         self.report_text.setReadOnly(True)
         self.report_text.setStyleSheet("""
             QTextEdit {
-                background-color: #0d1117; color: #00ff41;
+                background-color: #0a192f; color: #64ffda;
                 font-family: 'Courier New', monospace; font-size: 11px;
-                border: 2px solid #00ff41; padding: 10px;
+                border: 2px solid #64ffda; padding: 10px;
             }
         """)
         
@@ -217,10 +261,10 @@ class StatusReportWindow(QDialog):
         close_btn = QPushButton("CLOSE")
         close_btn.setStyleSheet("""
             QPushButton {
-                font-size: 12px; padding: 8px; background-color: #00ff41;
-                color: #0a0e1a; border: none; border-radius: 3px; font-weight: bold;
+                font-size: 12px; padding: 8px; background-color: #64ffda;
+                color: #0a192f; border: none; border-radius: 3px; font-weight: bold;
             }
-            QPushButton:hover { background-color: #00cc33; }
+            QPushButton:hover { background-color: #57d8c0; }
         """)
         close_btn.clicked.connect(self.close)
         layout.addWidget(close_btn)
@@ -240,7 +284,7 @@ class StartMenu(QWidget):
     def init_ui(self):
         self.setStyleSheet("""
             QWidget {
-                background-color: #0a0e1a; color: #00ff41;
+                background-color: #0a192f; color: #64ffda;
                 font-family: 'Courier New', monospace;
             }
         """)
@@ -251,7 +295,7 @@ class StartMenu(QWidget):
         container_frame = QFrame()
         container_frame.setStyleSheet("""
             QFrame {
-                background-color: #1a1f2e; border: 2px solid #00ff41;
+                background-color: #112240; border: 2px solid #64ffda;
                 border-radius: 10px; padding: 30px;
                 max-width: 450px;
             }
@@ -260,43 +304,43 @@ class StartMenu(QWidget):
         container_layout.setSpacing(15)
 
         title = QLabel("NAVAL COMBAT")
-        title.setStyleSheet("font-size: 32px; font-weight: bold; color: #00ff41; letter-spacing: 6px; border: none; padding: 0;")
+        title.setStyleSheet("font-size: 32px; font-weight: bold; color: #64ffda; letter-spacing: 6px; border: none; padding: 0;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         container_layout.addWidget(title)
 
         subtitle = QLabel("SIMULATION SYSTEM")
-        subtitle.setStyleSheet("font-size: 18px; color: #00ff41; letter-spacing: 4px; border: none; padding: 0;")
+        subtitle.setStyleSheet("font-size: 18px; color: #ccd6f6; letter-spacing: 4px; border: none; padding: 0;")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         container_layout.addWidget(subtitle)
 
         divider = QFrame()
         divider.setFrameShape(QFrame.Shape.HLine)
-        divider.setStyleSheet("background-color: #00ff41; max-height: 2px; border: none;")
+        divider.setStyleSheet("background-color: #64ffda; max-height: 2px; border: none;")
         container_layout.addWidget(divider)
         
         container_layout.addSpacing(20)
 
         mission_label = QLabel("DIFFICULTY LEVEL")
-        mission_label.setStyleSheet("font-size: 13px; font-weight: bold; color: #00ff41; letter-spacing: 2px; border: none; padding: 0;")
+        mission_label.setStyleSheet("font-size: 13px; font-weight: bold; color: #64ffda; letter-spacing: 2px; border: none; padding: 0;")
         container_layout.addWidget(mission_label)
 
         self.mission_combo = QComboBox()
         self.mission_combo.addItems(["Patrol Boat", "Attack Vessel"])
         self.mission_combo.setStyleSheet("""
             QComboBox {
-                font-size: 13px; padding: 8px; background-color: #2d4a2b;
-                color: #00ff41; border: 2px solid #00ff41; border-radius: 5px;
+                font-size: 13px; padding: 8px; background-color: #1d3b53;
+                color: #64ffda; border: 2px solid #64ffda; border-radius: 5px;
                 font-weight: bold; letter-spacing: 1px;
             }
             QComboBox::drop-down { border: none; }
             QComboBox::down-arrow {
                 image: none; border-left: 5px solid transparent;
-                border-right: 5px solid transparent; border-top: 5px solid #00ff41;
+                border-right: 5px solid transparent; border-top: 5px solid #64ffda;
                 width: 0; height: 0; margin-right: 15px;
             }
             QComboBox QAbstractItemView {
-                background-color: #2d4a2b; color: #00ff41;
-                selection-background-color: #3d5a3b; border: 2px solid #00ff41;
+                background-color: #1d3b53; color: #64ffda;
+                selection-background-color: #2c4a63; border: 2px solid #64ffda;
             }
         """)
         container_layout.addWidget(self.mission_combo)
@@ -306,11 +350,11 @@ class StartMenu(QWidget):
         self.start_btn = QPushButton("START SIMULATION")
         self.start_btn.setStyleSheet("""
             QPushButton {
-                font-size: 16px; padding: 12px; background-color: #00ff41;
-                color: #0a0e1a; border: none; border-radius: 5px;
+                font-size: 16px; padding: 12px; background-color: #64ffda;
+                color: #0a192f; border: none; border-radius: 5px;
                 font-weight: bold; letter-spacing: 2px;
             }
-            QPushButton:hover { background-color: #00cc33; }
+            QPushButton:hover { background-color: #57d8c0; }
         """)
         container_layout.addWidget(self.start_btn)
         
@@ -352,9 +396,9 @@ class SimulationWindow(QMainWindow):
         self.setWindowTitle("Naval Combat Simulation - AI Enhanced")
         self.setGeometry(50, 50, 1400, 800)
         self.setStyleSheet("""
-            QMainWindow { background-color: #0a0e1a; }
+            QMainWindow { background-color: #0a192f; }
             QWidget {
-                background-color: #0a0e1a; color: #00ff41;
+                background-color: #0a192f; color: #ccd6f6;
                 font-family: 'Courier New', monospace;
             }
         """)
@@ -367,7 +411,7 @@ class SimulationWindow(QMainWindow):
 
         # Top status bar
         top_bar = QWidget()
-        top_bar.setStyleSheet("background-color: #0d1117; border-bottom: 1px solid #00ff41;")
+        top_bar.setStyleSheet("background-color: #112240; border-bottom: 1px solid #64ffda;")
         top_bar_layout = QHBoxLayout(top_bar)
         top_bar_layout.setContentsMargins(20, 10, 20, 10)
 
@@ -377,11 +421,11 @@ class SimulationWindow(QMainWindow):
         status_layout.setContentsMargins(0, 0, 0, 0)
 
         status_title = QLabel("STATUS")
-        status_title.setStyleSheet("font-size: 10px; color: #00ff41; letter-spacing: 2px;")
+        status_title.setStyleSheet("font-size: 10px; color: #64ffda; letter-spacing: 2px;")
         status_layout.addWidget(status_title)
 
         self.enemy_label = QLabel("Enemies Detected: 0")
-        self.enemy_label.setStyleSheet("font-size: 16px; color: #00ff41; font-weight: bold;")
+        self.enemy_label.setStyleSheet("font-size: 16px; color: #ccd6f6; font-weight: bold;")
         status_layout.addWidget(self.enemy_label)
 
         top_bar_layout.addWidget(status_container)
@@ -393,18 +437,18 @@ class SimulationWindow(QMainWindow):
         contacts_layout.setContentsMargins(0, 0, 0, 0)
 
         contacts_title = QLabel("CONTACTS")
-        contacts_title.setStyleSheet("font-size: 10px; color: #00ff41; letter-spacing: 2px;")
+        contacts_title.setStyleSheet("font-size: 10px; color: #64ffda; letter-spacing: 2px;")
         contacts_layout.addWidget(contacts_title)
 
         self.hostile_label = QLabel("0 HOSTILE")
-        self.hostile_label.setStyleSheet("font-size: 16px; color: #ff0000; font-weight: bold;")
+        self.hostile_label.setStyleSheet("font-size: 16px; color: #ff4646; font-weight: bold;")
         contacts_layout.addWidget(self.hostile_label)
 
         top_bar_layout.addWidget(contacts_container)
         top_bar_layout.addStretch()
 
         active_indicator = QLabel("● ACTIVE")
-        active_indicator.setStyleSheet("font-size: 14px; color: #00ff41; font-weight: bold;")
+        active_indicator.setStyleSheet("font-size: 14px; color: #64ffda; font-weight: bold;")
         top_bar_layout.addWidget(active_indicator)
 
         main_layout.addWidget(top_bar)
@@ -415,24 +459,24 @@ class SimulationWindow(QMainWindow):
 
         # Radar container
         radar_container = QWidget()
-        radar_container.setStyleSheet("background-color: #0a0e1a; border-right: 1px solid #00ff41;")
+        radar_container.setStyleSheet("background-color: #0a192f; border-right: 1px solid #64ffda;")
         radar_layout = QVBoxLayout(radar_container)
         radar_layout.setContentsMargins(10, 10, 10, 10)
         radar_layout.setSpacing(5)
         
         self.scene = QGraphicsScene(0, 0, 800, 600)
-        self.scene.setBackgroundBrush(QBrush(QColor(10, 14, 26)))
+        self.scene.setBackgroundBrush(QBrush(QColor(10, 25, 47)))
         self.view = QGraphicsView(self.scene)
-        self.view.setStyleSheet("border: 2px solid #00ff41; background-color: #0a0e1a;")
+        self.view.setStyleSheet("border: 2px solid #64ffda; background-color: #0a192f;")
         self.view.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.view.mousePressEvent = self.radar_click
         self.view.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self.view.keyPressEvent = self.keyPressEvent # Route key events from view to main window
+        self.view.keyPressEvent = self.keyPressEvent
         radar_layout.addWidget(self.view)
 
         # Bottom command buttons
         button_container = QWidget()
-        button_container.setStyleSheet("background-color: #0d1117; border-top: 1px solid #00ff41;")
+        button_container.setStyleSheet("background-color: #112240; border-top: 1px solid #64ffda;")
         button_layout = QHBoxLayout(button_container)
         button_layout.setSpacing(5)
         button_layout.setContentsMargins(10, 8, 10, 8)
@@ -440,10 +484,10 @@ class SimulationWindow(QMainWindow):
         comms_btn = QPushButton("Communicate")
         comms_btn.setStyleSheet("""
             QPushButton {
-                font-size: 10px; padding: 6px 10px; background-color: #1a1f2e;
-                color: #00ff41; border: 1px solid #00ff41; border-radius: 3px; letter-spacing: 1px;
+                font-size: 10px; padding: 6px 10px; background-color: #112240;
+                color: #64ffda; border: 1px solid #64ffda; border-radius: 3px; letter-spacing: 1px;
             }
-            QPushButton:hover { background-color: #2a3f3e; }
+            QPushButton:hover { background-color: #1d3b53; }
         """)
         comms_btn.clicked.connect(self.show_communicate_window)
         button_layout.addWidget(comms_btn)
@@ -451,10 +495,10 @@ class SimulationWindow(QMainWindow):
         status_report_btn = QPushButton("Status Report")
         status_report_btn.setStyleSheet("""
             QPushButton {
-                font-size: 10px; padding: 6px 10px; background-color: #1a1f2e;
-                color: #00ff41; border: 1px solid #00ff41; border-radius: 3px; letter-spacing: 1px;
+                font-size: 10px; padding: 6px 10px; background-color: #112240;
+                color: #64ffda; border: 1px solid #64ffda; border-radius: 3px; letter-spacing: 1px;
             }
-            QPushButton:hover { background-color: #2a3f3e; }
+            QPushButton:hover { background-color: #1d3b53; }
         """)
         status_report_btn.clicked.connect(self.show_status_report_window)
         button_layout.addWidget(status_report_btn)
@@ -466,7 +510,7 @@ class SimulationWindow(QMainWindow):
 
         # Control panel
         control_panel = QWidget()
-        control_panel.setStyleSheet("background-color: #0d1117;")
+        control_panel.setStyleSheet("background-color: #112240;")
         control_layout = QVBoxLayout(control_panel)
         control_layout.setSpacing(10)
         control_layout.setContentsMargins(15, 15, 15, 15)
@@ -474,19 +518,19 @@ class SimulationWindow(QMainWindow):
         self.pause_btn = QPushButton("⏸ PAUSE")
         self.pause_btn.setStyleSheet("""
             QPushButton {
-                font-size: 14px; padding: 12px; background-color: #00ff41;
-                color: #0a0e1a; border: none; border-radius: 3px;
+                font-size: 14px; padding: 12px; background-color: #64ffda;
+                color: #0a192f; border: none; border-radius: 3px;
                 font-weight: bold; letter-spacing: 2px;
             }
-            QPushButton:hover { background-color: #00cc33; }
+            QPushButton:hover { background-color: #57d8c0; }
         """)
         self.pause_btn.clicked.connect(self.toggle_pause)
         control_layout.addWidget(self.pause_btn)
 
         self.status_label = QLabel("Status: Ready\nUse WASD to navigate to patrol zone")
         self.status_label.setStyleSheet("""
-            font-size: 11px; padding: 10px; background-color: #1a1f2e;
-            color: #00ff41; border: 1px solid #00ff41; border-radius: 3px;
+            font-size: 11px; padding: 10px; background-color: #1d3b53;
+            color: #64ffda; border: 1px solid #64ffda; border-radius: 3px;
         """)
         self.status_label.setWordWrap(True)
         self.status_label.setMinimumHeight(70)
@@ -496,18 +540,27 @@ class SimulationWindow(QMainWindow):
         details_frame = QFrame()
         details_frame.setStyleSheet("""
             QFrame {
-                background-color: #1a1f2e; border: 1px solid #00ff41;
+                background-color: #1d3b53; border: 1px solid #64ffda;
                 border-radius: 3px; padding: 10px;
             }
         """)
+        details_frame.setMinimumHeight(150)
         details_layout = QVBoxLayout(details_frame)
         details_title = QLabel("VESSEL DETAILS")
-        details_title.setStyleSheet("font-size: 12px; font-weight: bold; color: #00ff41; letter-spacing: 1px;")
+        details_title.setStyleSheet("font-size: 12px; font-weight: bold; color: #64ffda; letter-spacing: 1px;")
         details_layout.addWidget(details_title)
+        
+        details_scroll = QScrollArea()
+        details_scroll.setWidgetResizable(True)
+        details_scroll.setStyleSheet("QScrollArea { border: none; background-color: transparent; }")
+        
         self.details_label = QLabel("No vessel selected")
-        self.details_label.setStyleSheet("font-size: 11px; color: #00ff41;")
+        self.details_label.setStyleSheet("font-size: 11px; color: #ccd6f6; background-color: transparent;")
         self.details_label.setWordWrap(True)
-        details_layout.addWidget(self.details_label)
+
+        details_scroll.setWidget(self.details_label)
+        details_layout.addWidget(details_scroll)
+
         control_layout.addWidget(details_frame)
 
         # Action buttons
@@ -517,11 +570,11 @@ class SimulationWindow(QMainWindow):
         self.intercept_btn = QPushButton("⊕ INTERCEPT VESSEL")
         self.intercept_btn.setStyleSheet("""
             QPushButton {
-                font-size: 11px; padding: 8px; background-color: #8b0000;
-                color: #ff4444; border: 2px solid #ff0000; border-radius: 3px;
+                font-size: 11px; padding: 8px; background-color: #4a2525;
+                color: #ff4646; border: 2px solid #ff4646; border-radius: 3px;
                 font-weight: bold; letter-spacing: 1px;
             }
-            QPushButton:hover { background-color: #a00000; }
+            QPushButton:hover { background-color: #6b3535; }
             QPushButton:disabled {
                 background-color: #2a2a2a; color: #555555; border-color: #333333;
             }
@@ -529,6 +582,38 @@ class SimulationWindow(QMainWindow):
         self.intercept_btn.setEnabled(False)
         self.intercept_btn.clicked.connect(self.intercept_vessel)
         action_layout.addWidget(self.intercept_btn)
+
+        self.mark_safe_btn = QPushButton("✓ MARK AS SAFE")
+        self.mark_safe_btn.setStyleSheet("""
+            QPushButton {
+                font-size: 11px; padding: 8px; background-color: #1d3b53;
+                color: #64ffda; border: 2px solid #64ffda; border-radius: 3px;
+                font-weight: bold; letter-spacing: 1px;
+            }
+            QPushButton:hover { background-color: #2c4a63; }
+            QPushButton:disabled {
+                background-color: #2a2a2a; color: #555555; border-color: #333333;
+            }
+        """)
+        self.mark_safe_btn.setEnabled(False)
+        self.mark_safe_btn.clicked.connect(self.mark_safe)
+        action_layout.addWidget(self.mark_safe_btn)
+
+        self.mark_threat_btn = QPushButton("⚠ MARK AS THREAT")
+        self.mark_threat_btn.setStyleSheet("""
+            QPushButton {
+                font-size: 11px; padding: 8px; background-color: #4d4d00;
+                color: #ffff00; border: 2px solid #ffff00; border-radius: 3px;
+                font-weight: bold; letter-spacing: 1px;
+            }
+            QPushButton:hover { background-color: #5d5d00; }
+            QPushButton:disabled {
+                background-color: #2a2a2a; color: #555555; border-color: #333333;
+            }
+        """)
+        self.mark_threat_btn.setEnabled(False)
+        self.mark_threat_btn.clicked.connect(self.mark_as_threat)
+        action_layout.addWidget(self.mark_threat_btn)
         
         control_layout.addLayout(action_layout)
         
@@ -554,6 +639,34 @@ class SimulationWindow(QMainWindow):
         dialog = StatusLogWindow(self.controller, self)
         dialog.exec()
 
+    def show_hail_dialog(self, unit):
+        """Handles the logic for hailing a vessel and returns if suspicious."""
+        hail_message = "Unidentified vessel, this is Naval Patrol. Identify yourself immediately."
+        is_suspicious = False
+        
+        threat = unit.true_threat_level
+        vessel_type = unit.vessel_type
+
+        if threat == "confirmed":
+            is_suspicious = True
+            responses = [f"This is the warship '{vessel_type}'. Stay clear or you will be fired upon!", "...", "[Radio Silence]", "[Static followed by weapon system charging sounds]"]
+            response_message = random.choice(responses)
+        elif threat == "possible":
+            is_suspicious = True
+            responses = [f"This is private vessel '{vessel_type}'. State your intentions.", "We are on a private charter. We do not need to identify.", "...Stand by... We are experiencing engine trouble."]
+            response_message = random.choice(responses)
+        else: # neutral
+            is_suspicious = False
+            responses = [f"This is the fishing vessel '{vessel_type}'. Just hauling in a catch, over.", f"Roger that, patrol. This is '{vessel_type}', all is well.", f"Hey there! This is the '{vessel_type}', just enjoying the day."]
+            response_message = random.choice(responses)
+        
+        self.controller.add_log(f"Hailed {vessel_type}. Response: '{response_message}'")
+        
+        dialog = HailVesselDialog(vessel_type, hail_message, response_message, self)
+        dialog.exec()
+        
+        return is_suspicious
+
     def keyPressEvent(self, event):
         if self.controller.game_over:
             return
@@ -576,13 +689,20 @@ class SimulationWindow(QMainWindow):
                 if item.scene() == self.scene:
                     self.scene.removeItem(item)
         self.graphics_items.clear()
+        
+        # Add grid lines
+        grid_pen = QPen(QColor(20, 35, 60), 1, Qt.PenStyle.SolidLine)
+        for x in range(0, 801, 50):
+            self.scene.addLine(x, 0, x, 600, grid_pen)
+        for y in range(0, 601, 50):
+            self.scene.addLine(0, y, 800, y, grid_pen)
 
         # Draw patrol zone with conditional coloring
         zr = self.controller.zone_rect
         zone_item = QGraphicsRectItem(zr["x"], zr["y"], zr["width"], zr["height"])
-        zone_item.setPen(QPen(QColor(0, 255, 65, 150), 2, Qt.PenStyle.DashLine))
+        zone_item.setPen(QPen(QColor(255, 70, 70, 150), 2, Qt.PenStyle.DashLine))
         if self.patrol_phase_active:
-            zone_item.setBrush(QBrush(QColor(0, 255, 65, 20)))
+            zone_item.setBrush(QBrush(QColor(255, 70, 70, 20)))
         else:
             zone_item.setBrush(QBrush(Qt.BrushStyle.NoBrush))
         self.scene.addItem(zone_item)
@@ -594,8 +714,8 @@ class SimulationWindow(QMainWindow):
             player_items = []
             triangle = QPolygonF([QPointF(0, -15), QPointF(-10, 10), QPointF(10, 10)])
             player_item = QGraphicsPolygonItem(triangle)
-            player_item.setBrush(QBrush(QColor(0, 255, 65)))
-            player_item.setPen(QPen(QColor(200, 255, 200), 2))
+            player_item.setBrush(QBrush(QColor(100, 255, 218))) # Cyan
+            player_item.setPen(QPen(QColor(200, 255, 230), 2))
             player_item.setPos(player_unit.x, player_unit.y)
             self.scene.addItem(player_item)
             player_items.append(player_item)
@@ -608,19 +728,19 @@ class SimulationWindow(QMainWindow):
                     continue
                 
                 items = []
-                color = QColor(128, 128, 128)
-                border = QColor(100, 100, 100)
+                color = QColor(136, 146, 176) # Light slate for unknown
+                border = QColor(100, 110, 140)
 
                 if unit.scanned:
                     if unit.threat_level == "neutral":
-                        color = QColor(0, 255, 65)
-                        border = QColor(0, 200, 50)
+                        color = QColor(100, 255, 218) # Cyan
+                        border = QColor(150, 255, 230)
                     elif unit.threat_level == "possible":
-                        color = QColor(255, 255, 255)
+                        color = QColor(255, 255, 255) # White
                         border = QColor(200, 200, 200)
                     else:  # confirmed
-                        color = QColor(255, 0, 0)
-                        border = QColor(200, 0, 0)
+                        color = QColor(255, 70, 70) # Red
+                        border = QColor(200, 50, 50)
 
                 item = QGraphicsEllipseItem(-8, -8, 16, 16)
                 item.setBrush(QBrush(color))
@@ -648,6 +768,8 @@ class SimulationWindow(QMainWindow):
             self.controller.selected_unit = None
             self.details_label.setText("No vessel selected")
             self.intercept_btn.setEnabled(False)
+            self.mark_safe_btn.setEnabled(False)
+            self.mark_threat_btn.setEnabled(False)
             return
 
         scene_pos = self.view.mapToScene(event.pos())
@@ -657,23 +779,49 @@ class SimulationWindow(QMainWindow):
             distance = self.controller.get_distance(self.controller.player_ship, unit)
             in_intercept_range = distance <= self.controller.INTERCEPT_RANGE
             
+            # Show hail dialog and get result
+            is_suspicious = self.show_hail_dialog(unit)
+            
+            # Enable buttons based on hail result and range
             self.intercept_btn.setEnabled(in_intercept_range)
+            self.mark_safe_btn.setEnabled(not is_suspicious)
+            self.mark_threat_btn.setEnabled(is_suspicious)
 
-            threat_text = threat_text = unit.threat_level.capitalize() if unit.scanned else "Unknown"
+            threat_text = unit.threat_level.capitalize() if unit.scanned else "Unknown"
             details = (f"Type: {unit.vessel_type}\n"
                        f"Threat Level: {threat_text}\n"
-                       f"Distance: {distance:.0f} m")
+                       f"Distance: {distance:.0f} m\n\n"
+                       f"COMMUNICATION LOGGED.")
             self.details_label.setText(details)
         else:
             self.details_label.setText("No vessel selected")
             self.intercept_btn.setEnabled(False)
+            self.mark_safe_btn.setEnabled(False)
+            self.mark_threat_btn.setEnabled(False)
         self.update_display()
 
     def intercept_vessel(self):
         is_correct, threat_level, message = self.controller.intercept_vessel()
-        # The controller already adds logs
         self.details_label.setText("No vessel selected")
         self.intercept_btn.setEnabled(False)
+        self.mark_safe_btn.setEnabled(False)
+        self.mark_threat_btn.setEnabled(False)
+        self.update_display()
+
+    def mark_safe(self):
+        is_correct, threat_level, message = self.controller.mark_safe()
+        self.details_label.setText("No vessel selected")
+        self.intercept_btn.setEnabled(False)
+        self.mark_safe_btn.setEnabled(False)
+        self.mark_threat_btn.setEnabled(False)
+        self.update_display()
+
+    def mark_as_threat(self):
+        is_correct, threat_level, message = self.controller.mark_threat()
+        self.details_label.setText("No vessel selected")
+        self.intercept_btn.setEnabled(False)
+        self.mark_safe_btn.setEnabled(False)
+        self.mark_threat_btn.setEnabled(False)
         self.update_display()
 
     def update_simulation(self):
@@ -699,6 +847,8 @@ class SimulationWindow(QMainWindow):
                 self.controller.paused = False
                 self.controller.add_log("Patrol zone reached. Engaging main simulation.")
                 self.pause_btn.setText("⏸ PAUSE")
+                # Expands the view to fit the entire scene
+                self.view.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatioByExpanding)
         
         if self.controller.in_patrol_zone:
             self.status_label.setText(
@@ -707,7 +857,7 @@ class SimulationWindow(QMainWindow):
             )
         else:
             self.status_label.setText(
-                "Status: Outside Patrol Zone\nUse WASD to navigate to the green zone."
+                "Status: Outside Patrol Zone\nUse WASD to navigate to the red zone."
             )
 
         self.update_display()
