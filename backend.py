@@ -1,8 +1,7 @@
 """
-backend.py - Enhanced with UI interaction methods and dynamic zone shrinking
+backend.py - Enhanced with UI interaction methods and FIXED dynamic zone management
 
-Fixed to remove duplicate zone logic, ensure consistent state handling,
-maintain all classes, and provide clean event emissions for the UI.
+FIXED: Proper zone expansion/shrinking, boundary enforcement, and vessel spawning
 """
 
 import math
@@ -15,7 +14,6 @@ import numpy as np
 # -----------------------------------------------------------------------------
 # Vessel dataclass
 # -----------------------------------------------------------------------------
-
 
 @dataclass
 class Vessel:
@@ -77,11 +75,9 @@ class Vessel:
             "last_update": self.last_update,
         }
 
-
 # -----------------------------------------------------------------------------
 # FleetManager
 # -----------------------------------------------------------------------------
-
 
 class FleetManager:
     def __init__(self, region_size: Tuple[float, float] = (800.0, 600.0)):
@@ -192,21 +188,15 @@ class FleetManager:
 
         return spawned
 
-
 # -----------------------------------------------------------------------------
-# HailMessageGenerator - Handles vessel communication logic
+# HailMessageGenerator
 # -----------------------------------------------------------------------------
-
 
 class HailMessageGenerator:
     """Generates hail messages and responses based on vessel threat level"""
 
     @staticmethod
     def generate_hail_response(vessel: Vessel) -> Tuple[str, str, bool]:
-        """
-        Generate hail and response messages for a vessel.
-        Returns: (hail_message, response_message, is_suspicious)
-        """
         hail_message = "Unidentified vessel, this is Naval Patrol. Identify yourself immediately."
         is_suspicious = False
         threat = vessel.true_threat_level
@@ -229,7 +219,7 @@ class HailMessageGenerator:
                 "...Stand by... We are experiencing engine trouble."
             ]
             response_message = random.choice(responses)
-        else:  # neutral
+        else:
             is_suspicious = False
             responses = [
                 f"This is the fishing vessel '{vessel_type}'. Just hauling in a catch, over.",
@@ -240,11 +230,9 @@ class HailMessageGenerator:
 
         return hail_message, response_message, is_suspicious
 
-
 # -----------------------------------------------------------------------------
-# SimulationController
+# SimulationController - FIXED RADAR LOGIC
 # -----------------------------------------------------------------------------
-
 
 class SimulationController:
     INTERCEPT_RANGE = 150
@@ -253,50 +241,54 @@ class SimulationController:
         self.mission_type = mission_type
         self.difficulty = difficulty
         self.player_data = player_data or {}
+
         self.fleet = FleetManager(region_size=(800.0, 600.0))
         self.status_log: List[str] = []
         self.selected_unit: Optional[Vessel] = None
         self.game_over: bool = False
-        self.paused: bool = True
-        self.patrol_phase_active: bool = True
+        self.paused: bool = False
+
+        # track whether player is inside the original small patrol box
         self.in_patrol_zone: bool = False
 
-        # Enhanced zone management with shrinking capability
-        self.zone_rect = {"x": 300.0, "y": 200.0, "width": 200.0, "height": 200.0}
-        self.original_zone_rect = self.zone_rect.copy()  # Store original
-        self.zone_expanded = False  # Track if zone was expanded
+        # zone rect used by ui.py (original small zone)
+        self.zone_rect = {"x": 300, "y": 200, "width": 200, "height": 200}
+        # keep a copy of the original rect so we can expand/collapse correctly
+        self.zone_rect_original = dict(self.zone_rect)
+        self.zone_rect_expanded: Optional[Dict[str, float]] = None
+        self.zone_expanded: bool = False
 
-        # Create player ship BEFORE registering to set ID manually
-        self.player_ship = Vessel(
-            id=-1,  # Temporary ID, will be replaced
-            vessel_type="Player Vessel",
-            x=100.0,
-            y=100.0,
-            vx=0.0,
-            vy=0.0,
-            speed=2.0,
-            crew_count=5
-        )
-        # Register will assign proper ID
+        # UI expects this flag (true when in patrol phase / small box displayed)
+        self.patrol_phase_active: bool = True
+
+        # player vessel: create and register via fleet
+        self.player_ship = Vessel(id=0, vessel_type="Player Vessel", x=100.0, y=100.0, vx=0.0, vy=0.0, speed=2.0)
         self.fleet.register_vessel(self.player_ship)
+
+        # units is an ordered list used throughout UI (player first)
         self.units: List[Vessel] = [self.player_ship]
+
+        # temp markers (red dots) visible in patrol phase; cleared on expansion
         self.temp_threat_markers: List[Tuple[float, float]] = []
+
+        # internal flags
         self._generated_vessels = False
+        # track ids of vessels spawned when zone expanded so we can deactivate them on collapse
+        self._spawned_ids: List[int] = []
+
+        # key state map for continuous movement (supports hold behavior)
         self.key_states: Dict[str, bool] = {"w": False, "a": False, "s": False, "d": False}
 
-        self._listeners: Dict[str, List[Callable[..., None]]] = {
-            "zone_expanded": [], "zone_shrunk": [], "boats_spawned": [], "tick": []
-        }
+        # event listeners
+        self._listeners: Dict[str, List[Callable[..., None]]] = {"zone_expanded": [], "boats_spawned": [], "tick": []}
 
-        self.ai_generate_fn: Optional[Callable[[int, Tuple[float, float, float, float]], List[Dict[str, Any]]]] = None
+        self.ai_generate_fn = None
+
+        # tuning
         self.enemy_separation = 25.0
         self.enemy_max_speed = 1.8
         self.zone_expand_padding = (200.0, 150.0)
         self.threat_upgrade_prob_per_tick = 0.002
-
-    # ------------------------
-    # Event API
-    # ------------------------
 
     def on(self, event_name: str, cb: Callable[..., None]):
         if event_name not in self._listeners:
@@ -310,10 +302,6 @@ class SimulationController:
             except Exception:
                 pass
 
-    # ------------------------
-    # Logging
-    # ------------------------
-
     def add_log(self, msg: str):
         timestamp = time.strftime("%H:%M:%S")
         entry = f"[{timestamp}] {msg}"
@@ -322,13 +310,9 @@ class SimulationController:
             self.status_log.pop(0)
 
     def get_status_log(self) -> List[str]:
-        """Get the status log entries"""
         return self.status_log.copy()
 
-    # ------------------------
-    # Movement API
-    # ------------------------
-
+    # FIXED: Movement with boundary enforcement
     def set_key_state(self, key: str, pressed: bool):
         if key in ("up", "down", "left", "right"):
             km = {"up": "w", "down": "s", "left": "a", "right": "d"}
@@ -337,7 +321,6 @@ class SimulationController:
             self.key_states[key] = bool(pressed)
 
     def stop_player_movement(self):
-        """Stop all player movement (space key)"""
         for k in list(self.key_states.keys()):
             self.key_states[k] = False
         self.player_ship.vx = 0.0
@@ -368,46 +351,112 @@ class SimulationController:
                 vy = (dy / norm) * speed
             self.player_ship.set_velocity(vx, vy)
 
-    # ------------------------
-    # ENHANCED Zone detection & management with shrinking
-    # ------------------------
-
+    # FIXED: Zone detection - check if player touches the CURRENT zone boundary
     def _patrol_in_zone(self) -> bool:
-        zr = self.zone_rect
+        """Check if player is touching or inside the current zone"""
         px, py = self.player_ship.x, self.player_ship.y
-        return (zr["x"] <= px <= zr["x"] + zr["width"]) and (zr["y"] <= py <= zr["y"] + zr["height"])
+        
+        if not self.zone_expanded:
+            # Check against original small zone
+            return (self.original_x <= px <= self.original_x + self.original_width) and \
+                   (self.original_y <= py <= self.original_y + self.original_height)
+        else:
+            # Check against expanded zone (full screen)
+            return (0 <= px <= 800) and (0 <= py <= 600)
 
+    # FIXED: Zone expansion - MODIFY the SAME zone_rect
+    # --- Replace _expand_zone with this version ---
     def _expand_zone(self):
-        """Expand the patrol zone when player enters"""
-        x_min = self.original_zone_rect["x"]
-        x_max = self.original_zone_rect["x"] + self.original_zone_rect["width"]
-        y_min = self.original_zone_rect["y"]
-        y_max = self.original_zone_rect["y"] + self.original_zone_rect["height"]
+        """Expand zone (called once). Emits zone_expanded event and clears temporary markers."""
+        if self.zone_expanded:
+            return
 
+        x_min = self.zone_rect["x"]
+        x_max = self.zone_rect["x"] + self.zone_rect["width"]
+        y_min = self.zone_rect["y"]
+        y_max = self.zone_rect["y"] + self.zone_rect["height"]
         pad_x, pad_y = self.zone_expand_padding
         new_region = (
-            max(0.0, x_min - pad_x),
+            max(0, x_min - pad_x),
             min(self.fleet.region_w, x_max + pad_x),
-            max(0.0, y_min - pad_y),
+            max(0, y_min - pad_y),
             min(self.fleet.region_h, y_max + pad_y),
         )
 
-        self.zone_rect = {
+    # store expanded rect and set as current zone_rect
+        self.zone_rect_expanded = {
             "x": new_region[0],
             "y": new_region[2],
             "width": new_region[1] - new_region[0],
             "height": new_region[3] - new_region[2],
         }
-
+        self.zone_rect = dict(self.zone_rect_expanded)
         self.zone_expanded = True
+
+        # end patrol phase (UI uses this)
+        self.patrol_phase_active = False
+
+        # clear UI red markers (these are temp UI markers)
         self.temp_threat_markers.clear()
         self._emit("zone_expanded", self.zone_rect)
         self.add_log("Patrol zone expanded; revealing regional contacts.")
 
+        # --- Add this new method to collapse zone dynamically ---
+    def _collapse_zone(self):
+        """Collapse the zone back to the original small patrol rect and clear spawned vessels."""
+        if not self.zone_expanded:
+            return
+
+        # reset zone rect to original
+        self.zone_rect = dict(self.zone_rect_original)
+        self.zone_rect_expanded = None
+        self.zone_expanded = False
+
+        # re-enter patrol phase UI state
+        self.patrol_phase_active = True
+
+        # deactivate/soft-remove spawned vessels (so UI stops drawing them)
+        for vid in list(self._spawned_ids):
+            v = self.fleet.vessels.get(vid)
+
+            if v:
+                v.active = False
+        self._spawned_ids.clear()
+
+        # clean up units list so only active vessels remain (player kept)
+        self.units = [self.player_ship] + [v for v in self.fleet.active_vessels() if v is not self.player_ship]
+
+        self._generated_vessels = False
+        self.temp_threat_markers.clear()
+        self._emit("zone_collapsed", self.zone_rect)
+        self.add_log("Patrol zone collapsed; returning to original patrol area.")
+
+
+       # --- Add helper checks for original/expanded containment ---
+    def _player_inside_original_zone(self) -> bool:
+        zr = self.zone_rect_original
+        px, py = self.player_ship.x, self.player_ship.y
+        return (zr["x"] <= px <= zr["x"] + zr["width"]) and (zr["y"] <= py <= zr["y"] + zr["height"])
+
+    def _player_inside_expanded_zone(self) -> bool:
+        if not self.zone_rect_expanded:
+            return False
+        zr = self.zone_rect_expanded
+        px, py = self.player_ship.x, self.player_ship.y
+        return (zr["x"] <= px <= zr["x"] + zr["width"]) and (zr["y"] <= py <= zr["y"] + zr["height"])
+
+
+
+    # FIXED: Zone shrinking - RESTORE the SAME zone_rect
     def _shrink_zone(self):
-        """Shrink the patrol zone back to original when player leaves"""
+        """INSTANTLY shrink the SAME zone_rect back to original size"""
         if self.zone_expanded:
-            self.zone_rect = self.original_zone_rect.copy()
+            # Restore original values to the same zone_rect
+            self.zone_rect["x"] = self.original_x
+            self.zone_rect["y"] = self.original_y
+            self.zone_rect["width"] = self.original_width
+            self.zone_rect["height"] = self.original_height
+            
             self.zone_expanded = False
 
             # Remove vessels that are now outside the original zone
@@ -428,29 +477,27 @@ class SimulationController:
 
     def _vessel_in_original_zone(self, vessel: Vessel) -> bool:
         """Check if vessel is within the original zone boundaries"""
-        oz = self.original_zone_rect
-        return (oz["x"] <= vessel.x <= oz["x"] + oz["width"]) and (oz["y"] <= vessel.y <= oz["y"] + oz["height"])
+        return (self.original_x <= vessel.x <= self.original_x + self.original_width) and \
+               (self.original_y <= vessel.y <= self.original_y + self.original_height)
 
-    # ------------------------
-    # Vessel generation
-    # ------------------------
-
+    # FIXED: Vessel generation in full screen when expanded
+    # --- Replace generate_random_vessels to track spawned ids ---
     def generate_random_vessels(self, count: int = 6, min_distance: float = 40.0) -> List[Vessel]:
-        """Generate random vessels in the patrol zone"""
+        """Create vessels inside current (possibly expanded) zone with collision-safe placement."""
         x_min = self.zone_rect["x"]
         x_max = self.zone_rect["x"] + self.zone_rect["width"]
         y_min = self.zone_rect["y"]
         y_max = self.zone_rect["y"] + self.zone_rect["height"]
-
         region = (x_min, x_max, y_min, y_max)
         avoid = [np.array((self.player_ship.x, self.player_ship.y), dtype=float)]
-
-        spawned = self.fleet.spawn_safe_random(count=count, region=region,
-                                               avoid_positions=avoid, min_distance=min_distance)
+        spawned = self.fleet.spawn_safe_random(count=count, region=region, avoid_positions=avoid, min_distance=min_distance)
 
         for v in spawned:
             self.units.append(v)
+            # track spawned ids for collapse cleanup
+            self._spawned_ids.append(v.id)
 
+        # AI augmentation callback remains as before (unchanged)
         if self.ai_generate_fn:
             try:
                 details = self.ai_generate_fn(len(spawned), region)
@@ -463,18 +510,21 @@ class SimulationController:
                         v.items = list(det["items"])
                     if "weapons" in det:
                         v.weapons = list(det["weapons"])
+                    if "threat_level" in det:
+                        v.true_threat_level = det["threat_level"]
+                    if "velocity" in det:
+                        vx, vy = det["velocity"]
+                        v.set_velocity(float(vx), float(vy))
             except Exception:
                 pass
 
-        self._emit("boats_spawned", [v.to_dict() for v in spawned])
         self._generated_vessels = True
-        self.add_log(f"Generated {len(spawned)} vessels in patrol zone.")
+        self._emit("boats_spawned", [v.to_dict() for v in spawned])
+        self.add_log(f"Spawned {len(spawned)} vessels in region.")
         return spawned
 
-    # ------------------------
-    # Enemy movement
-    # ------------------------
 
+    # FIXED: Enemy movement with boundary enforcement
     def _update_enemy_movement(self, dt: float = 1.0):
         active_enemies = [v for v in self.units if v.active and v is not self.player_ship]
         n = len(active_enemies)
@@ -501,12 +551,9 @@ class SimulationController:
             speed = np.linalg.norm(new_vel)
             if speed > self.enemy_max_speed:
                 new_vel = (new_vel / speed) * self.enemy_max_speed
+            
             v.vx, v.vy = float(new_vel[0]), float(new_vel[1])
             v.update_position(dt=dt, bounds=(self.fleet.region_w, self.fleet.region_h))
-
-    # ------------------------
-    # Threat dynamics
-    # ------------------------
 
     def _update_threat_states(self):
         for v in self.units:
@@ -521,53 +568,73 @@ class SimulationController:
                     v.true_threat_level = "possible"
                     self.add_log(f"Contact {v.vessel_type} (id={v.id}) changed to POSSIBLE.")
 
-    # ------------------------
-    # ENHANCED Simulation tick with dynamic zone management (deduplicated)
-    # ------------------------
+    # FIXED: Check if player is outside the original zone (to trigger shrink)
+    def _player_exited_original_zone(self) -> bool:
+        """Check if player has exited the original zone boundaries"""
+        if not self.zone_expanded:
+            return False
+        
+        px, py = self.player_ship.x, self.player_ship.y
+        # Check if outside original zone
+        return not ((self.original_x <= px <= self.original_x + self.original_width) and 
+                   (self.original_y <= py <= self.original_y + self.original_height))
+    
+    def select_unit(self, x: float, y: float) -> Optional[Vessel]:
+        """Select a vessel by coordinates (called by UI click). Returns the vessel or None."""
+        for v in self.units:
+            if v is self.player_ship:
+                continue
+            if not v.active:
+                continue
+        # check if the click is close enough to the vessel
+            if math.hypot(x - v.x, y - v.y) <= 12.0:
+                v.scanned = True
+                self.selected_unit = v
+                return v
+        # nothing matched
+        self.selected_unit = None
+        return None
 
+    # FIXED: Simulation update with proper zone management
+    # --- Replace update_simulation with the version that collapses when leaving expanded zone ---
     def update_simulation(self):
-        # 1) Update player movement and clamp
-        self._apply_key_velocity()
-        self.player_ship.update_position(dt=1.0, bounds=(self.fleet.region_w, self.fleet.region_h))
-        self.player_ship.x = max(0.0, min(self.fleet.region_w, self.player_ship.x))
-        self.player_ship.y = max(0.0, min(self.fleet.region_h, self.player_ship.y))
-
-        # 2) Zone state change detection
-        was_in_zone = self.in_patrol_zone
-        is_in_zone = self._patrol_in_zone()
-        self.in_patrol_zone = is_in_zone
-
-        just_entered = is_in_zone and not was_in_zone
-        just_left = (not is_in_zone) and was_in_zone
-
-        # 3) Handle transitions
-        if just_entered and not self.zone_expanded:
-            self.patrol_phase_active = False
-            self.paused = False
-            self._expand_zone()
-            active_non_player = [v for v in self.units if v.active and v is not self.player_ship]
-            if len(active_non_player) < 3:
-                self.generate_random_vessels(count=6)
-        elif just_left and self.zone_expanded:
-            self._shrink_zone()
-
-        # 4) Early out when paused or game over
+        """Main per-frame update called by UI."""
         if self.paused or self.game_over:
             return
 
-        # 5) Enemy AI and threat updates
+        # 1) Apply player's held keys into velocity and move player
+        self._apply_key_velocity()
+        self.player_ship.update_position(dt=1.0, bounds=(self.fleet.region_w, self.fleet.region_h))
+
+        # 2) handle entering original small zone -> expand once
+        if (not self.in_patrol_zone) and self._player_inside_original_zone():
+            self.in_patrol_zone = True
+            self._expand_zone()
+            self.generate_random_vessels(count=8)
+
+        # 2b) handle leaving expanded zone -> collapse back
+        if self.zone_expanded and (not self._player_inside_expanded_zone()):
+            # player left the expanded area -> collapse and return to patrol
+            self._collapse_zone()
+            # leaving expanded means player probably outside the original small zone too
+            self.in_patrol_zone = False
+
+        # 3) update enemy movement and separation if region is expanded / vessels exist
         if self._generated_vessels:
             self._update_enemy_movement(dt=1.0)
-            self._update_threat_states()
 
-        # 6) Distances for UI
+        # 4) threat state dynamics
+        self._update_threat_states()
+
+        # 5) recompute distances
         for v in self.units:
             v.distance_from_patrol = self.get_distance(self.player_ship, v)
 
+        # 6) emit tick event
         self._emit("tick", None)
 
+
     def toggle_pause(self) -> bool:
-        """Toggle pause state and return current paused state"""
         self.paused = not self.paused
         if self.paused:
             self.add_log("Simulation paused.")
@@ -576,32 +643,24 @@ class SimulationController:
         return self.paused
 
     def unpause(self):
-        """Unpause the simulation"""
         self.paused = False
         self.add_log("Simulation started.")
 
-    # ------------------------
     # UI Query Methods
-    # ------------------------
-
     def is_game_over(self) -> bool:
-        """Check if game is over"""
         return self.game_over
 
     def is_patrol_phase_active(self) -> bool:
-        """Check if patrol phase is active"""
         return self.patrol_phase_active
 
     def is_in_patrol_zone(self) -> bool:
-        """Check if player is in patrol zone"""
         return self.in_patrol_zone
 
     def get_zone_info(self) -> Dict[str, float]:
-        """Get patrol zone information"""
+        # Return CURRENT zone (expands/shrinks) for UI to draw
         return self.zone_rect.copy()
 
     def get_vessel_positions(self) -> List[Dict[str, Any]]:
-        """Get all vessel positions for UI rendering"""
         positions = []
         for v in self.units:
             if not v.active:
@@ -615,12 +674,12 @@ class SimulationController:
                 "scanned": v.scanned,
                 "active": v.active,
                 "selected": (v is self.selected_unit),
-                "is_player": (v.id == self.player_ship.id)
+                "is_player": (v.id == self.player_ship.id),
+                "vessel_type": v.vessel_type
             })
         return positions
 
     def get_status_info(self) -> Dict[str, Any]:
-        """Get status information for UI display"""
         confirmed = sum(1 for u in self.units if u.true_threat_level == "confirmed" and u.active)
         total_possible = sum(1 for u in self.units if u.true_threat_level in ("possible", "confirmed") and u.active)
         accuracy = 0.8
@@ -631,7 +690,6 @@ class SimulationController:
         }
 
     def get_status_report(self) -> str:
-        """Generate status report text for UI"""
         status = self.get_status_info()
         active_count = sum(1 for u in self.units if u.active and u is not self.player_ship)
         report = (
@@ -656,7 +714,6 @@ class SimulationController:
         return report
 
     def get_nearby_ships(self) -> List[Dict[str, Any]]:
-        """Get list of nearby ships for communications panel"""
         result = []
         for v in self.units:
             if v is self.player_ship:
@@ -674,15 +731,7 @@ class SimulationController:
             })
         return result
 
-    # ------------------------
-    # Vessel Interaction
-    # ------------------------
-
     def handle_vessel_click(self, x: float, y: float) -> Optional[Dict[str, Any]]:
-        """
-        Handle vessel click event.
-        Returns vessel information including hail messages, or None if no vessel clicked.
-        """
         for v in self.units:
             if v is self.player_ship:
                 continue
@@ -708,44 +757,51 @@ class SimulationController:
         self.selected_unit = None
         return None
 
+    # --- Replace intercept_vessel with this corrected version ---
     def intercept_vessel(self) -> Tuple[bool, Optional[str], str]:
-        """Intercept the currently selected vessel"""
+        """Intercept action: remove target and return (was_correct, true_threat_level, message)."""
         if not self.selected_unit:
             return False, None, "No vessel selected."
         target = self.selected_unit
-        if target.crew_count > self.player_ship.crew_count:
-            return False, target.true_threat_level, "Target too large to intercept alone. Call for backup."
         was_correct = (target.true_threat_level == "confirmed")
         message = f"Intercept action taken on {target.vessel_type} (id={target.id}). Actual: {target.true_threat_level}."
+        # soft-remove
         target.active = False
         self.add_log(message)
+        # if we intercepted a vessel that was spawned in this expanded region, remove from tracking
+        if target.id in self._spawned_ids:
+            try:
+                self._spawned_ids.remove(target.id)
+            except ValueError:
+                pass
         self.selected_unit = None
         return was_correct, target.true_threat_level, message
 
+    # --- Replace mark_safe / mark_threat with cleaned-up versions ---
     def mark_safe(self) -> Tuple[bool, Optional[str], str]:
-        """Mark the currently selected vessel as safe"""
         if not self.selected_unit:
             return False, None, "No vessel selected."
         t = self.selected_unit
         was_correct = (t.true_threat_level == "neutral")
         t.threat_level = "neutral"
+        t.scanned = True
         self.add_log(f"Marked vessel id={t.id} as SAFE (actual={t.true_threat_level}).")
         self.selected_unit = None
         return was_correct, t.true_threat_level, f"Marked {t.vessel_type} as SAFE."
 
     def mark_threat(self) -> Tuple[bool, Optional[str], str]:
-        """Mark the currently selected vessel as threat"""
         if not self.selected_unit:
             return False, None, "No vessel selected."
         t = self.selected_unit
         was_correct = (t.true_threat_level in ("possible", "confirmed"))
         t.threat_level = "confirmed"
+        t.scanned = True
         self.add_log(f"Marked vessel id={t.id} as THREAT (actual={t.true_threat_level}).")
         self.selected_unit = None
         return was_correct, t.true_threat_level, f"Marked {t.vessel_type} as THREAT."
 
+
     def generate_distress_report(self) -> str:
-        """Generate a comprehensive distress report"""
         if not self.selected_unit:
             return "ERROR: No target vessel selected for distress call."
         target = self.selected_unit
@@ -796,7 +852,6 @@ ENGAGEMENT AUTHORIZATION: REQUESTED
         return report
 
     def distress_call(self) -> str:
-        """Enhanced distress call with comprehensive reporting"""
         if not self.selected_unit:
             return "No target for distress call."
         target = self.selected_unit
@@ -811,17 +866,11 @@ ENGAGEMENT AUTHORIZATION: REQUESTED
             self.add_log(f"Distress call for vessel {target.id} denied. Threat is manageable.")
             return f"Distress call denied. Engage target directly."
 
-    # ------------------------
-    # Utility Methods
-    # ------------------------
-
     @staticmethod
     def get_distance(a: Vessel, b: Vessel) -> float:
-        """Calculate distance between two vessels"""
         return math.hypot(a.x - b.x, a.y - b.y)
 
     def get_positions_for_ui(self) -> List[Dict[str, Any]]:
-        """Get vessel positions in UI-friendly format"""
         out = []
         for v in self.units:
             out.append({
@@ -834,7 +883,3 @@ ENGAGEMENT AUTHORIZATION: REQUESTED
                 "active": v.active
             })
         return out
-
-    # ------------------------
-    # Serialization (optional)
-    # ------------------------
