@@ -526,42 +526,44 @@ class SimulationController:
     # ENHANCED Simulation tick with dynamic zone management
     # ------------------------
 
-def update_simulation(self):
-    self._apply_key_velocity()
-    self.player_ship.update_position(dt=1.0, bounds=(self.fleet.region_w, self.fleet.region_h))
-    self.player_ship.x = max(0.0, min(self.fleet.region_w, self.player_ship.x))
-    self.player_ship.y = max(0.0, min(self.fleet.region_h, self.player_ship.y))
+    def update_simulation(self):
+        self._apply_key_velocity()
+        self.player_ship.update_position(dt=1.0, bounds=(self.fleet.region_w, self.fleet.region_h))
 
+        # Enhanced patrol phase logic with shrinking
+        if self.patrol_phase_active:
+            if (not self.in_patrol_zone) and self._patrol_in_zone():
+                self.in_patrol_zone = True
+                self.patrol_phase_active = False
+                self.paused = False
+                self._expand_zone()
+                self.generate_random_vessels(count=8)
+                return
 
-    # Fully dynamic zone logic
-    currently_in = self._patrol_in_zone()
+        # Handle zone shrinking when player moves out
+        if not self.patrol_phase_active and self.in_patrol_zone:
+            if not self._patrol_in_zone():
+                self.in_patrol_zone = False
+                self._shrink_zone()
+            elif self._patrol_in_zone() and not self.zone_expanded:
+                # Player re-entered, expand again if needed
+                self.in_patrol_zone = True
+                self._expand_zone()
+                # Optionally regenerate vessels
+                if len([v for v in self.units if v.active and v is not self.player_ship]) < 3:
+                    self.generate_random_vessels(count=5)
 
-    # Expand on first enter or re-enter
-    if currently_in and not self.zone_expanded:
-        self.in_patrol_zone = True
-        self.patrol_phase_active = False
-        self.paused = False
-        self._expand_zone()
-        # Spawn only if very few active non-player vessels
-        if len([v for v in self.units if v.active and v is not self.player_ship]) < 3:
-            self.generate_random_vessels(count=6)
+        if self.paused or self.game_over:
+            return
 
-    # Shrink upon exit
-    elif (not currently_in) and self.zone_expanded:
-        self.in_patrol_zone = False
-        self._shrink_zone()
+        if self._generated_vessels:
+            self._update_enemy_movement(dt=1.0)
+            self._update_threat_states()
 
-    if self.paused or self.game_over:
-        return
+        for v in self.units:
+            v.distance_from_patrol = self.get_distance(self.player_ship, v)
 
-    if self._generated_vessels:
-        self._update_enemy_movement(dt=1.0)
-        self._update_threat_states()
-
-    for v in self.units:
-        v.distance_from_patrol = self.get_distance(self.player_ship, v)
-
-    self._emit("tick", None)
+        self._emit("tick", None)
 
     def toggle_pause(self) -> bool:
         """Toggle pause state and return current paused state"""
