@@ -2,6 +2,7 @@
 ui.py - User Interface for Naval Combat Simulation
 Complete military-style UI with all requested features
 """
+# tested over and out
 
 import sys
 import random
