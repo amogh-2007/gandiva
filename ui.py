@@ -699,6 +699,8 @@ class SimulationWindow(QMainWindow):
                 self.controller.paused = False
                 self.controller.add_log("Patrol zone reached. Engaging main simulation.")
                 self.pause_btn.setText("⏸ PAUSE")
+                # Expands the view to fit the entire scene
+                self.view.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatioByExpanding)
         
         if self.controller.in_patrol_zone:
             self.status_label.setText(
