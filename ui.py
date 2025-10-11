@@ -23,6 +23,50 @@ from backend import SimulationController
 # POPUP WINDOWS
 # =============================================================================
 
+class HailVesselDialog(QDialog):
+    """Popup for hailing a vessel and seeing its response."""
+    def __init__(self, vessel_type, hail_message, response_message, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"Hailing: {vessel_type}")
+        self.setGeometry(400, 400, 500, 250)
+        self.setStyleSheet("QDialog { background-color: #0a192f; }")
+
+        layout = QVBoxLayout()
+        layout.setSpacing(15)
+
+        title = QLabel("COMMUNICATION CHANNEL OPEN")
+        title.setStyleSheet("""
+            font-size: 14px; font-weight: bold; color: #64ffda; letter-spacing: 2px;
+            padding: 10px; background-color: #112240; border: 1px solid #64ffda;
+        """)
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+        
+        hail_label = QLabel(f"OUTGOING HAIL:\n> {hail_message}")
+        hail_label.setWordWrap(True)
+        hail_label.setStyleSheet("font-size: 11px; color: #8892b0;")
+        layout.addWidget(hail_label)
+        
+        response_label = QLabel(f"INCOMING RESPONSE:\n> {response_message}")
+        response_label.setWordWrap(True)
+        response_label.setStyleSheet("font-size: 12px; color: #ccd6f6; font-weight: bold;")
+        layout.addWidget(response_label)
+        
+        layout.addStretch()
+
+        close_btn = QPushButton("CLOSE CHANNEL")
+        close_btn.setStyleSheet("""
+            QPushButton {
+                font-size: 12px; padding: 8px; background-color: #64ffda;
+                color: #0a192f; border: none; border-radius: 3px; font-weight: bold;
+            }
+            QPushButton:hover { background-color: #57d8c0; }
+        """)
+        close_btn.clicked.connect(self.accept)
+        layout.addWidget(close_btn)
+        
+        self.setLayout(layout)
+
 class StatusLogWindow(QDialog):
     """Status log window showing mission events"""
     def __init__(self, controller, parent=None):
@@ -595,6 +639,34 @@ class SimulationWindow(QMainWindow):
         dialog = StatusLogWindow(self.controller, self)
         dialog.exec()
 
+    def show_hail_dialog(self, unit):
+        """Handles the logic for hailing a vessel and returns if suspicious."""
+        hail_message = "Unidentified vessel, this is Naval Patrol. Identify yourself immediately."
+        is_suspicious = False
+        
+        threat = unit.true_threat_level
+        vessel_type = unit.vessel_type
+
+        if threat == "confirmed":
+            is_suspicious = True
+            responses = [f"This is the warship '{vessel_type}'. Stay clear or you will be fired upon!", "...", "[Radio Silence]", "[Static followed by weapon system charging sounds]"]
+            response_message = random.choice(responses)
+        elif threat == "possible":
+            is_suspicious = True
+            responses = [f"This is private vessel '{vessel_type}'. State your intentions.", "We are on a private charter. We do not need to identify.", "...Stand by... We are experiencing engine trouble."]
+            response_message = random.choice(responses)
+        else: # neutral
+            is_suspicious = False
+            responses = [f"This is the fishing vessel '{vessel_type}'. Just hauling in a catch, over.", f"Roger that, patrol. This is '{vessel_type}', all is well.", f"Hey there! This is the '{vessel_type}', just enjoying the day."]
+            response_message = random.choice(responses)
+        
+        self.controller.add_log(f"Hailed {vessel_type}. Response: '{response_message}'")
+        
+        dialog = HailVesselDialog(vessel_type, hail_message, response_message, self)
+        dialog.exec()
+        
+        return is_suspicious
+
     def keyPressEvent(self, event):
         if self.controller.game_over:
             return
@@ -617,6 +689,13 @@ class SimulationWindow(QMainWindow):
                 if item.scene() == self.scene:
                     self.scene.removeItem(item)
         self.graphics_items.clear()
+        
+        # Add grid lines
+        grid_pen = QPen(QColor(20, 35, 60), 1, Qt.PenStyle.SolidLine)
+        for x in range(0, 801, 50):
+            self.scene.addLine(x, 0, x, 600, grid_pen)
+        for y in range(0, 601, 50):
+            self.scene.addLine(0, y, 800, y, grid_pen)
 
         # Draw patrol zone with conditional coloring
         zr = self.controller.zone_rect
@@ -700,14 +779,19 @@ class SimulationWindow(QMainWindow):
             distance = self.controller.get_distance(self.controller.player_ship, unit)
             in_intercept_range = distance <= self.controller.INTERCEPT_RANGE
             
+            # Show hail dialog and get result
+            is_suspicious = self.show_hail_dialog(unit)
+            
+            # Enable buttons based on hail result and range
             self.intercept_btn.setEnabled(in_intercept_range)
-            self.mark_safe_btn.setEnabled(True)
-            self.mark_threat_btn.setEnabled(True)
+            self.mark_safe_btn.setEnabled(not is_suspicious)
+            self.mark_threat_btn.setEnabled(is_suspicious)
 
-            threat_text = threat_text = unit.threat_level.capitalize() if unit.scanned else "Unknown"
+            threat_text = unit.threat_level.capitalize() if unit.scanned else "Unknown"
             details = (f"Type: {unit.vessel_type}\n"
                        f"Threat Level: {threat_text}\n"
-                       f"Distance: {distance:.0f} m")
+                       f"Distance: {distance:.0f} m\n\n"
+                       f"COMMUNICATION LOGGED.")
             self.details_label.setText(details)
         else:
             self.details_label.setText("No vessel selected")
