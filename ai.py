@@ -194,17 +194,16 @@ class NavalAI:
         self.update_target_model()
         
         # Training parameters
-        self.replay_buffer = PrioritizedReplayBuffer(buffer_size=2000)  # Smaller for faster training
-        self.discount_factor = 0.95
+        self.replay_buffer = PrioritizedReplayBuffer(buffer_size=5000)  # Increased buffer
+        self.discount_factor = 0.90  # Reduced for more immediate rewards
         self.epsilon = 1.0
-        self.epsilon_min = 0.01
-        self.epsilon_decay = 0.998  # Slower decay for more exploration
+        self.epsilon_min = 0.05  # Higher minimum exploration
+        self.epsilon_decay = 0.998  # Slower decay
         self.batch_size = 32
-        self.train_counter = 0
         
         # Human-in-the-loop parameters
-        self.hitl_confidence_threshold = 0.7
-        self.reward_shaping = {"human_override": -10, "human_confirm": +8}
+        self.hitl_confidence_threshold = 0.6  # Lower threshold for more autonomy
+        self.reward_shaping = {"human_override": -8, "human_confirm": +6}  # Balanced rewards
         
         # Performance tracking
         self.performance_metrics = {

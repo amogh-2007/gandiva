@@ -4,7 +4,7 @@ Advanced AI Training with Curriculum Learning - FIXED VERSION
 """
 
 import numpy as np
-from ai_training import AITrainingPipeline
+from ai_training import EnhancedAITrainingPipeline  # Changed import
 
 class CurriculumAITrainer:
     """
@@ -36,7 +36,7 @@ class CurriculumAITrainer:
             }
         ]
     
-    def calculate_stage_performance(self, pipeline: AITrainingPipeline, stage_config: dict) -> float:
+    def calculate_stage_performance(self, pipeline: EnhancedAITrainingPipeline, stage_config: dict) -> float:  # Updated type hint
         """Calculate performance metric for current stage"""
         recent_rewards = pipeline.training_metrics['episode_rewards'][-5:]  # Smaller window
         if not recent_rewards:
@@ -62,7 +62,7 @@ class CurriculumAITrainer:
         print("Starting Curriculum Training")
         print("=" * 50)
         
-        pipeline = AITrainingPipeline(episodes=1, steps_per_episode=50)  # Reduced for testing
+        pipeline = EnhancedAITrainingPipeline(episodes=1, steps_per_episode=50)  # Updated class name
         
         total_episodes = 0
         
@@ -110,7 +110,7 @@ class CurriculumAITrainer:
         
         print("\n" + "=" * 50)
         print("🎓 Curriculum Training Completed!")
-        pipeline._print_final_report()
+        pipeline._print_comprehensive_report()  # Fixed method name
 
 if __name__ == "__main__":
     # Choose training method
@@ -121,5 +121,5 @@ if __name__ == "__main__":
         trainer.train_with_curriculum()
     else:
         # Standard training with smaller defaults for testing
-        pipeline = AITrainingPipeline(episodes=50, steps_per_episode=50)
+        pipeline = EnhancedAITrainingPipeline(episodes=50, steps_per_episode=50)  # Updated class name
         pipeline.train()
