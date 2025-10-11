@@ -1,7 +1,6 @@
 # curriculum_trainer.py
 """
-Advanced AI Training with Curriculum Learning
-Progressively increases difficulty for better learning
+Advanced AI Training with Curriculum Learning - FIXED VERSION
 """
 
 import numpy as np
@@ -9,44 +8,37 @@ from ai_training import AITrainingPipeline
 
 class CurriculumAITrainer:
     """
-    Implements curriculum learning for naval AI training
+    Implements curriculum learning for naval AI training - FIXED
     """
     
     def __init__(self):
         self.curriculum_stages = [
             {
                 'name': 'Beginner',
-                'episodes': 50,
+                'episodes': 20,  # Reduced for testing
                 'difficulty': 'easy',
                 'success_threshold': 0.7,
                 'focus': 'basic_threat_detection'
             },
             {
                 'name': 'Intermediate', 
-                'episodes': 100,
+                'episodes': 30,
                 'difficulty': 'medium',
                 'success_threshold': 0.6,
                 'focus': 'mixed_scenarios'
             },
             {
                 'name': 'Advanced',
-                'episodes': 150,
+                'episodes': 40,
                 'difficulty': 'hard',
                 'success_threshold': 0.5,
                 'focus': 'complex_threats'
-            },
-            {
-                'name': 'Expert',
-                'episodes': 200,
-                'difficulty': 'expert',
-                'success_threshold': 0.4,
-                'focus': 'advanced_tactics'
             }
         ]
     
     def calculate_stage_performance(self, pipeline: AITrainingPipeline, stage_config: dict) -> float:
         """Calculate performance metric for current stage"""
-        recent_rewards = pipeline.training_metrics['episode_rewards'][-10:]
+        recent_rewards = pipeline.training_metrics['episode_rewards'][-5:]  # Smaller window
         if not recent_rewards:
             return 0.0
         
@@ -70,7 +62,7 @@ class CurriculumAITrainer:
         print("Starting Curriculum Training")
         print("=" * 50)
         
-        pipeline = AITrainingPipeline(episodes=1, steps_per_episode=100)  # Will be overridden
+        pipeline = AITrainingPipeline(episodes=1, steps_per_episode=50)  # Reduced for testing
         
         total_episodes = 0
         
@@ -87,7 +79,7 @@ class CurriculumAITrainer:
             # Train for this stage
             stage_episodes = 0
             while stage_episodes < stage_config['episodes']:
-                episodes_to_run = min(10, stage_config['episodes'] - stage_episodes)
+                episodes_to_run = min(5, stage_config['episodes'] - stage_episodes)  # Smaller batches
                 
                 # Run batch of episodes
                 for _ in range(episodes_to_run):
@@ -128,6 +120,6 @@ if __name__ == "__main__":
         trainer = CurriculumAITrainer()
         trainer.train_with_curriculum()
     else:
-        # Standard training
-        pipeline = AITrainingPipeline(episodes=100, steps_per_episode=100)
+        # Standard training with smaller defaults for testing
+        pipeline = AITrainingPipeline(episodes=50, steps_per_episode=50)
         pipeline.train()
