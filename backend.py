@@ -1,15 +1,16 @@
-# backend.py - Enhanced with UI interaction methods
+# backend.py - Enhanced with UI interaction methods and dynamic zone shrinking
+
 import math
 import random
 import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, Callable, Any
-
 import numpy as np
 
 # -----------------------------------------------------------------------------
 # Vessel dataclass
 # -----------------------------------------------------------------------------
+
 @dataclass
 class Vessel:
     id: int
@@ -36,6 +37,7 @@ class Vessel:
         self.x += self.vx * dt
         self.y += self.vy * dt
         self.last_update = time.time()
+
         if bounds is not None:
             w, h = bounds
             self.x = max(0.0, min(w, self.x))
@@ -69,10 +71,10 @@ class Vessel:
             "last_update": self.last_update,
         }
 
-
 # -----------------------------------------------------------------------------
 # FleetManager
 # -----------------------------------------------------------------------------
+
 class FleetManager:
     def __init__(self, region_size: Tuple[float, float] = (800.0, 600.0)):
         self._next_id = 1
@@ -138,7 +140,6 @@ class FleetManager:
         x_min, x_max, y_min, y_max = region
         spawned: List[Vessel] = []
         attempts = 0
-
         existing_positions = [np.array((v.x, v.y), dtype=float) for v in self.active_vessels()]
 
         while len(spawned) < count and attempts < max_attempts:
@@ -146,8 +147,8 @@ class FleetManager:
             x = float(random.uniform(x_min, x_max))
             y = float(random.uniform(y_min, y_max))
             pos = np.array((x, y), dtype=float)
-
             bad = False
+
             for ap in avoid_positions:
                 if np.linalg.norm(pos - ap) < min_distance:
                     bad = True
@@ -176,18 +177,20 @@ class FleetManager:
             vtype = random.choice(["Fishing Boat", "Cargo Ship", "Speedboat", "Patrol Craft"])
             threat = random.choices(["neutral", "possible", "confirmed"], weights=[0.6, 0.3, 0.1])[0]
             crew = random.randint(2, 25)
+
             new_v = self.add_vessel(x=x, y=y, vx=vx, vy=vy, vessel_type=vtype, true_threat_level=threat, crew_count=crew)
             spawned.append(new_v)
             existing_positions.append(np.array((x, y), dtype=float))
-        return spawned
 
+        return spawned
 
 # -----------------------------------------------------------------------------
 # HailMessageGenerator - Handles vessel communication logic
 # -----------------------------------------------------------------------------
+
 class HailMessageGenerator:
     """Generates hail messages and responses based on vessel threat level"""
-    
+
     @staticmethod
     def generate_hail_response(vessel: Vessel) -> Tuple[str, str, bool]:
         """
@@ -196,7 +199,6 @@ class HailMessageGenerator:
         """
         hail_message = "Unidentified vessel, this is Naval Patrol. Identify yourself immediately."
         is_suspicious = False
-        
         threat = vessel.true_threat_level
         vessel_type = vessel.vessel_type
 
@@ -217,7 +219,7 @@ class HailMessageGenerator:
                 "...Stand by... We are experiencing engine trouble."
             ]
             response_message = random.choice(responses)
-        else:  # neutral
+        else: # neutral
             is_suspicious = False
             responses = [
                 f"This is the fishing vessel '{vessel_type}'. Just hauling in a catch, over.",
@@ -225,13 +227,13 @@ class HailMessageGenerator:
                 f"Hey there! This is the '{vessel_type}', just enjoying the day."
             ]
             response_message = random.choice(responses)
-        
-        return hail_message, response_message, is_suspicious
 
+        return hail_message, response_message, is_suspicious
 
 # -----------------------------------------------------------------------------
 # SimulationController
 # -----------------------------------------------------------------------------
+
 class SimulationController:
     INTERCEPT_RANGE = 150
 
@@ -239,7 +241,6 @@ class SimulationController:
         self.mission_type = mission_type
         self.difficulty = difficulty
         self.player_data = player_data or {}
-
         self.fleet = FleetManager(region_size=(800.0, 600.0))
         self.status_log: List[str] = []
         self.selected_unit: Optional[Vessel] = None
@@ -248,35 +249,36 @@ class SimulationController:
         self.patrol_phase_active: bool = True
         self.in_patrol_zone: bool = False
 
+        # Enhanced zone management with shrinking capability
         self.zone_rect = {"x": 300, "y": 200, "width": 200, "height": 200}
+        self.original_zone_rect = {"x": 300, "y": 200, "width": 200, "height": 200}  # Store original
+        self.zone_expanded = False  # Track if zone was expanded
 
         # Create player ship BEFORE registering to set ID manually
         self.player_ship = Vessel(
             id=-1,  # Temporary ID, will be replaced
-            vessel_type="Player Vessel", 
-            x=100.0, 
-            y=100.0, 
-            vx=0.0, 
-            vy=0.0, 
-            speed=2.0, 
+            vessel_type="Player Vessel",
+            x=100.0,
+            y=100.0,
+            vx=0.0,
+            vy=0.0,
+            speed=2.0,
             crew_count=5
         )
         # Register will assign proper ID
         self.fleet.register_vessel(self.player_ship)
-        
         print(f"[BACKEND DEBUG] Player ship created with ID: {self.player_ship.id}")
 
         self.units: List[Vessel] = [self.player_ship]
         self.temp_threat_markers: List[Tuple[float, float]] = []
         self._generated_vessels = False
-
         self.key_states: Dict[str, bool] = {"w": False, "a": False, "s": False, "d": False}
+
         self._listeners: Dict[str, List[Callable[..., None]]] = {
-            "zone_expanded": [], "boats_spawned": [], "tick": []
+            "zone_expanded": [], "zone_shrunk": [], "boats_spawned": [], "tick": []
         }
 
         self.ai_generate_fn: Optional[Callable[[int, Tuple[float, float, float, float]], List[Dict[str, Any]]]] = None
-
         self.enemy_separation = 25.0
         self.enemy_max_speed = 1.8
         self.zone_expand_padding = (200.0, 150.0)
@@ -285,6 +287,7 @@ class SimulationController:
     # ------------------------
     # Event API
     # ------------------------
+
     def on(self, event_name: str, cb: Callable[..., None]):
         if event_name not in self._listeners:
             self._listeners[event_name] = []
@@ -300,6 +303,7 @@ class SimulationController:
     # ------------------------
     # Logging
     # ------------------------
+
     def add_log(self, msg: str):
         timestamp = time.strftime("%H:%M:%S")
         entry = f"[{timestamp}] {msg}"
@@ -314,6 +318,7 @@ class SimulationController:
     # ------------------------
     # Movement API
     # ------------------------
+
     def set_key_state(self, key: str, pressed: bool):
         if key in ("up", "down", "left", "right"):
             km = {"up": "w", "down": "s", "left": "a", "right": "d"}
@@ -354,18 +359,21 @@ class SimulationController:
             self.player_ship.set_velocity(vx, vy)
 
     # ------------------------
-    # Zone detection & expansion
+    # ENHANCED Zone detection & management with shrinking
     # ------------------------
+
     def _patrol_in_zone(self) -> bool:
         zr = self.zone_rect
         px, py = self.player_ship.x, self.player_ship.y
         return (zr["x"] <= px <= zr["x"] + zr["width"]) and (zr["y"] <= py <= zr["y"] + zr["height"])
 
     def _expand_zone(self):
+        """Expand the patrol zone when player enters"""
         x_min = self.zone_rect["x"]
         x_max = self.zone_rect["x"] + self.zone_rect["width"]
         y_min = self.zone_rect["y"]
         y_max = self.zone_rect["y"] + self.zone_rect["height"]
+
         pad_x, pad_y = self.zone_expand_padding
         new_region = (
             max(0, x_min - pad_x),
@@ -373,36 +381,66 @@ class SimulationController:
             max(0, y_min - pad_y),
             min(self.fleet.region_h, y_max + pad_y),
         )
+
         self.zone_rect = {
             "x": new_region[0],
             "y": new_region[2],
             "width": new_region[1] - new_region[0],
             "height": new_region[3] - new_region[2],
         }
+
+        self.zone_expanded = True
         self.temp_threat_markers.clear()
         self._emit("zone_expanded", self.zone_rect)
         self.add_log("Patrol zone expanded; revealing regional contacts.")
 
+    def _shrink_zone(self):
+        """Shrink the patrol zone back to original when player leaves"""
+        if self.zone_expanded:
+            self.zone_rect = self.original_zone_rect.copy()
+            self.zone_expanded = False
+
+            # Remove vessels that are now outside the original zone
+            vessels_to_remove = []
+            for v in self.units:
+                if v is self.player_ship:
+                    continue
+                if not self._vessel_in_original_zone(v):
+                    vessels_to_remove.append(v)
+
+            for v in vessels_to_remove:
+                v.active = False
+                self.units.remove(v)
+
+            self._emit("zone_shrunk", self.zone_rect)
+            self.add_log(f"Patrol zone contracted. {len(vessels_to_remove)} contacts lost outside operational area.")
+
+    def _vessel_in_original_zone(self, vessel: Vessel) -> bool:
+        """Check if vessel is within the original zone boundaries"""
+        oz = self.original_zone_rect
+        return (oz["x"] <= vessel.x <= oz["x"] + oz["width"]) and (oz["y"] <= vessel.y <= oz["y"] + oz["height"])
+
     # ------------------------
     # Vessel generation
     # ------------------------
+
     def generate_random_vessels(self, count: int = 6, min_distance: float = 40.0) -> List[Vessel]:
         """Generate random vessels in the patrol zone"""
         x_min = self.zone_rect["x"]
         x_max = self.zone_rect["x"] + self.zone_rect["width"]
         y_min = self.zone_rect["y"]
         y_max = self.zone_rect["y"] + self.zone_rect["height"]
+
         region = (x_min, x_max, y_min, y_max)
         avoid = [np.array((self.player_ship.x, self.player_ship.y), dtype=float)]
-        
+
         print(f"[DEBUG] Generating {count} vessels in region: {region}")
         print(f"[DEBUG] Player position: ({self.player_ship.x}, {self.player_ship.y})")
-        
-        spawned = self.fleet.spawn_safe_random(count=count, region=region, 
-                                                 avoid_positions=avoid, min_distance=min_distance)
-        
+
+        spawned = self.fleet.spawn_safe_random(count=count, region=region,
+                                               avoid_positions=avoid, min_distance=min_distance)
+
         print(f"[DEBUG] Successfully spawned {len(spawned)} vessels")
-        
         for v in spawned:
             self.units.append(v)
             print(f"[DEBUG] Added vessel {v.id}: {v.vessel_type} at ({v.x:.1f}, {v.y:.1f})")
@@ -430,15 +468,14 @@ class SimulationController:
         self._generated_vessels = True
         self._emit("boats_spawned", [v.to_dict() for v in spawned])
         self.add_log(f"Spawned {len(spawned)} vessels in region.")
-        
         print(f"[DEBUG] Total units now: {len(self.units)}")
         print(f"[DEBUG] Active vessels: {len([v for v in self.units if v.active])}")
-        
         return spawned
 
     # ------------------------
     # Enemy movement
     # ------------------------
+
     def _update_enemy_movement(self, dt: float = 1.0):
         active_enemies = [v for v in self.units if v.active and v is not self.player_ship]
         n = len(active_enemies)
@@ -448,6 +485,7 @@ class SimulationController:
         for i, v in enumerate(active_enemies):
             repel = np.array((0.0, 0.0), dtype=float)
             pos_i = np.array((v.x, v.y), dtype=float)
+
             for j, other in enumerate(active_enemies):
                 if i == j:
                     continue
@@ -461,17 +499,16 @@ class SimulationController:
 
             wander = np.random.uniform(-0.03, 0.03, size=2)
             new_vel = np.array((v.vx, v.vy), dtype=float) + (repel + wander) * 0.5
-
             speed = np.linalg.norm(new_vel)
             if speed > self.enemy_max_speed:
                 new_vel = (new_vel / speed) * self.enemy_max_speed
-
             v.vx, v.vy = float(new_vel[0]), float(new_vel[1])
             v.update_position(dt=dt, bounds=(self.fleet.region_w, self.fleet.region_h))
 
     # ------------------------
     # Threat dynamics
     # ------------------------
+
     def _update_threat_states(self):
         for v in self.units:
             if not v.active or v is self.player_ship:
@@ -486,12 +523,14 @@ class SimulationController:
                     self.add_log(f"Contact {v.vessel_type} (id={v.id}) changed to POSSIBLE.")
 
     # ------------------------
-    # Simulation tick
+    # ENHANCED Simulation tick with dynamic zone management
     # ------------------------
+
     def update_simulation(self):
         self._apply_key_velocity()
         self.player_ship.update_position(dt=1.0, bounds=(self.fleet.region_w, self.fleet.region_h))
 
+        # Enhanced patrol phase logic with shrinking
         if self.patrol_phase_active:
             if (not self.in_patrol_zone) and self._patrol_in_zone():
                 self.in_patrol_zone = True
@@ -499,15 +538,27 @@ class SimulationController:
                 self.paused = False
                 self._expand_zone()
                 self.generate_random_vessels(count=8)
-            return
+                return
+
+        # Handle zone shrinking when player moves out
+        if not self.patrol_phase_active and self.in_patrol_zone:
+            if not self._patrol_in_zone():
+                self.in_patrol_zone = False
+                self._shrink_zone()
+            elif self._patrol_in_zone() and not self.zone_expanded:
+                # Player re-entered, expand again if needed
+                self.in_patrol_zone = True
+                self._expand_zone()
+                # Optionally regenerate vessels
+                if len([v for v in self.units if v.active and v is not self.player_ship]) < 3:
+                    self.generate_random_vessels(count=5)
 
         if self.paused or self.game_over:
             return
 
         if self._generated_vessels:
             self._update_enemy_movement(dt=1.0)
-
-        self._update_threat_states()
+            self._update_threat_states()
 
         for v in self.units:
             v.distance_from_patrol = self.get_distance(self.player_ship, v)
@@ -531,6 +582,7 @@ class SimulationController:
     # ------------------------
     # UI Query Methods
     # ------------------------
+
     def is_game_over(self) -> bool:
         """Check if game is over"""
         return self.game_over
@@ -564,10 +616,9 @@ class SimulationController:
                 "selected": (v is self.selected_unit),
                 "is_player": (v.id == self.player_ship.id)  # Check by ID
             })
-        
+
         print(f"[BACKEND DEBUG] Returning {len(positions)} vessel positions")
         print(f"[BACKEND DEBUG] Player ship ID is {self.player_ship.id}")
-        
         return positions
 
     def get_status_info(self) -> Dict[str, Any]:
@@ -575,6 +626,7 @@ class SimulationController:
         confirmed = sum(1 for u in self.units if u.true_threat_level == "confirmed" and u.active)
         total_possible = sum(1 for u in self.units if u.true_threat_level in ("possible", "confirmed") and u.active)
         accuracy = 0.8
+
         return {
             "confirmed_threats": confirmed,
             "total_threats": total_possible,
@@ -585,7 +637,7 @@ class SimulationController:
         """Generate status report text for UI"""
         status = self.get_status_info()
         active_count = sum(1 for u in self.units if u.active and u is not self.player_ship)
-        
+
         report = (
             f"== TACTICAL OVERVIEW ==\n"
             f"Mission Type: {self.mission_type}\n"
@@ -605,6 +657,7 @@ class SimulationController:
             f"Possible Threats: {status['total_threats'] - status['confirmed_threats']}\n"
             f"Patrol Zone: {'ENTERED' if self.in_patrol_zone else 'APPROACHING'}\n"
         )
+
         return report
 
     def get_nearby_ships(self) -> List[Dict[str, Any]]:
@@ -617,6 +670,7 @@ class SimulationController:
                 continue
             dist = self.get_distance(self.player_ship, v)
             result.append({
+                "id": v.id,
                 "vessel_type": v.vessel_type,
                 "distance": dist,
                 "threat_level": v.threat_level if v.scanned else "unknown",
@@ -628,6 +682,7 @@ class SimulationController:
     # ------------------------
     # Vessel Interaction
     # ------------------------
+
     def handle_vessel_click(self, x: float, y: float) -> Optional[Dict[str, Any]]:
         """
         Handle vessel click event.
@@ -638,19 +693,20 @@ class SimulationController:
                 continue
             if not v.active:
                 continue
+
             if math.hypot(x - v.x, y - v.y) <= 12.0:
                 v.scanned = True
                 self.selected_unit = v
-                
+
                 # Generate hail messages
                 hail_msg, response_msg, is_suspicious = HailMessageGenerator.generate_hail_response(v)
-                
+
                 # Log the interaction
                 self.add_log(f"Hailed {v.vessel_type}. Response: '{response_msg}'")
-                
+
                 # Calculate distance
                 distance = self.get_distance(self.player_ship, v)
-                
+
                 return {
                     "vessel_type": v.vessel_type,
                     "threat_level": v.threat_level,
@@ -662,7 +718,7 @@ class SimulationController:
                     "response_message": response_msg,
                     "is_suspicious": is_suspicious
                 }
-        
+
         self.selected_unit = None
         return None
 
@@ -670,14 +726,13 @@ class SimulationController:
         """Intercept the currently selected vessel"""
         if not self.selected_unit:
             return False, None, "No vessel selected."
-        
+
         target = self.selected_unit
         if target.crew_count > self.player_ship.crew_count:
             return False, target.true_threat_level, "Target too large to intercept alone. Call for backup."
 
         was_correct = (target.true_threat_level == "confirmed")
         message = f"Intercept action taken on {target.vessel_type} (id={target.id}). Actual: {target.true_threat_level}."
-        
         target.active = False
         self.add_log(message)
         self.selected_unit = None
@@ -687,7 +742,7 @@ class SimulationController:
         """Mark the currently selected vessel as safe"""
         if not self.selected_unit:
             return False, None, "No vessel selected."
-        
+
         t = self.selected_unit
         was_correct = (t.true_threat_level == "neutral")
         t.threat_level = "neutral"
@@ -699,7 +754,7 @@ class SimulationController:
         """Mark the currently selected vessel as threat"""
         if not self.selected_unit:
             return False, None, "No vessel selected."
-        
+
         t = self.selected_unit
         was_correct = (t.true_threat_level in ("possible", "confirmed"))
         t.threat_level = "confirmed"
@@ -707,12 +762,72 @@ class SimulationController:
         self.selected_unit = None
         return was_correct, t.true_threat_level, f"Marked {t.vessel_type} as THREAT."
 
+    def generate_distress_report(self) -> str:
+        """Generate a comprehensive distress report"""
+        if not self.selected_unit:
+            return "ERROR: No target vessel selected for distress call."
+
+        target = self.selected_unit
+        nearby_threats = [v for v in self.units if v.active and v is not self.player_ship 
+                         and v.true_threat_level in ("possible", "confirmed")]
+
+        report = f"""
+=== DISTRESS CALL REPORT ===
+TIMESTAMP: {time.strftime("%H:%M:%S - %Y-%m-%d")}
+CALLING VESSEL: {self.player_ship.vessel_type} (ID: {self.player_ship.id})
+POSITION: ({self.player_ship.x:.1f}, {self.player_ship.y:.1f})
+
+=== PRIMARY THREAT ===
+VESSEL TYPE: {target.vessel_type}
+VESSEL ID: {target.id}
+POSITION: ({target.x:.1f}, {target.y:.1f})
+DISTANCE: {self.get_distance(self.player_ship, target):.0f}m
+CREW COUNT: {target.crew_count}
+SPEED: {target.speed:.1f} knots
+HEADING: {target.heading:.0f}°
+THREAT LEVEL: {target.true_threat_level.upper()}
+SCANNED: {'YES' if target.scanned else 'NO'}
+
+=== ADDITIONAL THREATS IN AREA ===
+TOTAL POSSIBLE THREATS: {len(nearby_threats)}
+"""
+
+        for i, threat in enumerate(nearby_threats[:3], 1):  # Show max 3 additional threats
+            if threat.id != target.id:
+                report += f"""
+THREAT #{i}:
+- Type: {threat.vessel_type} (ID: {threat.id})
+- Position: ({threat.x:.1f}, {threat.y:.1f})
+- Distance from player: {self.get_distance(self.player_ship, threat):.0f}m
+- Threat Level: {threat.true_threat_level.upper()}
+"""
+
+        report += f"""
+=== TACTICAL SITUATION ===
+PATROL ZONE STATUS: {'ACTIVE' if self.in_patrol_zone else 'INACTIVE'}
+TOTAL ACTIVE VESSELS: {len([v for v in self.units if v.active])}
+CONFIRMED HOSTILES: {len([v for v in self.units if v.active and v.true_threat_level == 'confirmed'])}
+
+=== RECOMMENDATIONS ===
+IMMEDIATE BACKUP REQUIRED: {'YES' if target.crew_count > self.player_ship.crew_count else 'NO'}
+EVACUATION NEEDED: {'YES' if len(nearby_threats) >= 3 else 'NO'}
+ENGAGEMENT AUTHORIZATION: REQUESTED
+
+=== END REPORT ===
+"""
+        return report
+
     def distress_call(self) -> str:
-        """Call for backup on the currently selected vessel"""
+        """Enhanced distress call with comprehensive reporting"""
         if not self.selected_unit:
             return "No target for distress call."
-        
+
         target = self.selected_unit
+        report = self.generate_distress_report()
+
+        # Log the distress call
+        self.add_log(f"DISTRESS CALL: Backup requested for {target.vessel_type} (ID: {target.id})")
+
         if target.crew_count > self.player_ship.crew_count * 1.5:
             self.add_log(f"Distress call sent for vessel {target.id}. Backup is on the way.")
             target.active = False
@@ -720,11 +835,12 @@ class SimulationController:
             return f"Backup called for {target.vessel_type}. Threat neutralized."
         else:
             self.add_log(f"Distress call for vessel {target.id} denied. Threat is manageable.")
-            return f"Distress call denied. Engage target."
+            return f"Distress call denied. Engage target directly."
 
     # ------------------------
     # Utility Methods
     # ------------------------
+
     @staticmethod
     def get_distance(a: Vessel, b: Vessel) -> float:
         """Calculate distance between two vessels"""
@@ -748,33 +864,3 @@ class SimulationController:
     # ------------------------
     # Serialization (optional)
     # ------------------------
-    def export_to_json(self, filename: str):
-        """Export fleet data to JSON file"""
-        import json
-        data = [v.to_dict() for v in self.fleet.all_vessels()]
-        with open(filename, "w") as f:
-            json.dump(data, f, indent=2)
-
-    def import_from_json(self, filename: str):
-        """Import fleet data from JSON file"""
-        import json
-        with open(filename, "r") as f:
-            data = json.load(f)
-        for item in data:
-            v = Vessel(
-                id=0,
-                vessel_type=item.get("vessel_type", "Unknown"),
-                x=item.get("x", 0.0),
-                y=item.get("y", 0.0),
-                vx=item.get("vx", 0.0),
-                vy=item.get("vy", 0.0),
-                speed=item.get("speed", 0.0),
-                heading=item.get("heading", 0.0),
-                threat_level=item.get("threat_level", "unknown"),
-                true_threat_level=item.get("true_threat_level", "neutral"),
-                scanned=item.get("scanned", False),
-                active=item.get("active", True),
-                distance_from_patrol=item.get("distance_from_patrol", float("inf")),
-            )
-            self.fleet.register_vessel(v)
-            self.units.append(v)
