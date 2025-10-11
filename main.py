@@ -1,12 +1,11 @@
 """
 main.py - Entry point for Naval Combat Simulation
-Clean implementation with proper separation of UI and backend
+Complete implementation with all requested features
 """
 
 import sys
 from PyQt6.QtWidgets import QApplication
 from ui import NavalSimApp
-
 
 def main():
     """Main application entry point"""
@@ -14,24 +13,19 @@ def main():
     app.setStyle('Fusion')
     
     print("="*60)
-    print("🚀 NAVAL COMBAT SIMULATION - REFACTORED v3.0")
+    print("🚀 NAVAL COMBAT SIMULATION - COMPLETE v2.1")
     print("="*60)
-    print("📋 Architecture:")
-    print("   ✓ Clean separation: UI / Backend")
-    print("   ✓ Backend: All game logic and state")
-    print("   ✓ UI: Pure visualization and input")
-    print("   ✓ Communication via controller methods")
-    print()
-    print("📋 Features:")
-    print("   ✓ Military-style radar UI")
-    print("   ✓ WASD movement controls")
-    print("   ✓ Patrol phase with zone expansion")
-    print("   ✓ Vessel hailing and communication")
-    print("   ✓ Threat detection and classification")
-    print("   ✓ Intercept, mark safe/threat actions")
-    print("   ✓ Distress call system")
-    print("   ✓ Status log and reports")
-    print("   ✓ Dynamic enemy AI movement")
+    print("📋 Features Implemented:")
+    print("   ✓ Military-style UI (app2.py)")
+    print("   ✓ AI-adaptive ML scenarios (app3_ml.py)")
+    print("   ✓ Comms Link window")
+    print("   ✓ Status Log window")
+    print("   ✓ Range-based interception (100m)")
+    print("   ✓ Auto-scanning (150m range)")
+    print("   ✓ Hidden threat levels")
+    print("   ✓ Scrollable vessel details")
+    print("   ✓ Fixed start menu")
+    print("   ✓ Mark Threat/Safe buttons")
     print("="*60)
     print()
     
@@ -39,7 +33,6 @@ def main():
     window.show()
     
     sys.exit(app.exec())
-
 
 if __name__ == '__main__':
     main()
