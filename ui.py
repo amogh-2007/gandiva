@@ -555,6 +555,14 @@ class SimulationWindow(QMainWindow):
 
         self.setup_controls()
         self.setup_timer()
+        
+        # Zone animation variables
+        self.zone_graphics_item = None
+        self.current_zone_rect = self.controller.zone_rect_original.copy()
+
+        self.target_zone_rect = self.controller.zone_rect_original.copy()
+        self.zone_animation_speed = 10.0  # pixels per frame
+        
         self.update_display()
         
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -711,6 +719,53 @@ class SimulationWindow(QMainWindow):
         layout.addWidget(distress_section)
 
         return bottom_frame
+    
+    def show_communication_dialog(self, unit):
+        """Open a communication channel popup with the selected vessel."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"Communicate with {unit.vessel_type} (ID {unit.id})")
+        dialog.setModal(True)
+        dialog.resize(400, 300)
+
+        layout = QVBoxLayout(dialog)
+
+        # Info label
+        info_label = QLabel(f"You have opened a channel with {unit.vessel_type}.\n"
+                        "Type a message or warning below:")
+        layout.addWidget(info_label)
+
+        # Text input area
+        input_box = QTextEdit()
+        input_box.setPlaceholderText("e.g. Identify yourself, state your intentions...")
+        layout.addWidget(input_box)
+
+        # Response area
+        response_label = QLabel("Response will appear here.")
+        layout.addWidget(response_label)
+
+        # Buttons
+        button_row = QHBoxLayout()
+        send_button = QPushButton("Send")
+        close_button = QPushButton("Close Channel")
+        button_row.addWidget(send_button)
+        button_row.addWidget(close_button)
+        layout.addLayout(button_row)
+
+        # Handle send
+        def handle_send():
+            msg = input_box.toPlainText().strip()
+            if not msg:
+                response_label.setText("⚠️ Please type a message first.")
+                return
+
+            # ✅ Backend handles the AI response
+            reply = self.controller.respond_to_communication(unit.id, msg)
+            response_label.setText(f"📡 Response: {reply}")
+
+        send_button.clicked.connect(handle_send)
+        close_button.clicked.connect(dialog.accept)
+
+        dialog.exec()
 
     def setup_communication_section(self):
         comm_frame = QFrame()
@@ -841,13 +896,13 @@ class SimulationWindow(QMainWindow):
         report_window.exec()
 
     def update_display(self):
-        """FIXED: Update radar display - RED BOX changes INSTANTLY when touched"""
+        """FIXED: Update radar display - RED BOX ALWAYS VISIBLE and expands/shrinks"""
         for items in self.graphics_items.values():
             for item in items:
                 self.scene.removeItem(item)
         self.graphics_items.clear()
 
-        # Draw the RED BOX - INSTANT change when touched
+        # ALWAYS draw the zone (red box) - it expands and shrinks
         zone = self.controller.get_zone_info()
         zone_item = QGraphicsRectItem(zone["x"], zone["y"], zone["width"], zone["height"])
         zone_border = QColor(255, 70, 70, 255)
@@ -922,32 +977,47 @@ class SimulationWindow(QMainWindow):
         else:
             self.distress_status.setText("Select a vessel to enable emergency response")
 
+    # --- Replace radar_click in SimulationWindow ---
     def radar_click(self, event):
-        if self.controller.is_patrol_phase_active() or not self.controller.is_in_patrol_zone():
-            self._clear_selection()
+        # Disallow selection during patrol-phase or when not in the patrol zone
+        if self.controller.patrol_phase_active or not self.controller.in_patrol_zone:
+            self.controller.selected_unit = None
+            self.details_label.setText("No vessel selected")
+            self.intercept_btn.setEnabled(False)
+            self.mark_safe_btn.setEnabled(False)
+            self.mark_threat_btn.setEnabled(False)
             return
+
         scene_pos = self.view.mapToScene(event.pos())
-        vessel_info = self.controller.handle_vessel_click(scene_pos.x(), scene_pos.y())
-        if vessel_info:
-            dialog = HailVesselDialog(vessel_info, self)
-            dialog.exec()
-            distance = vessel_info['distance']
+        unit = self.controller.select_unit(scene_pos.x(), scene_pos.y())
+
+        if unit:
+            distance = self.controller.get_distance(self.controller.player_ship, unit)
             in_intercept_range = distance <= self.controller.INTERCEPT_RANGE
-            is_suspicious = vessel_info['is_suspicious']
+
+            # Do NOT auto-hail on selection any more.
+            # Intercept button opens the hail/communication dialog before performing action.
             self.intercept_btn.setEnabled(in_intercept_range)
-            self.mark_safe_btn.setEnabled(not is_suspicious)
-            self.mark_threat_btn.setEnabled(is_suspicious)
-            self.distress_btn.setEnabled(True)
-            threat_text = vessel_info['threat_level'].capitalize() if vessel_info['scanned'] else "Unknown"
-            details = (f"Type: {vessel_info['vessel_type']}\n"
-                       f"Threat Level: {threat_text}\n"
-                       f"Distance: {distance:.0f} m\n\n"
-                       f"Crew Size: {vessel_info['crew_count']}\n"
-                       f"COMMUNICATION LOGGED.")
+
+            # Allow manual marking after selection
+            self.mark_safe_btn.setEnabled(True)
+            self.mark_threat_btn.setEnabled(True)
+
+            threat_text = unit.threat_level.capitalize() if unit.scanned else "Unknown"
+            details = (f"Type: {unit.vessel_type}\n"
+                   f"Threat Level: {threat_text}\n"
+                   f"Distance: {distance:.0f} m\n\n"
+                   f"Click INTERCEPT to hail / communicate.")
             self.details_label.setText(details)
+            self.show_communication_dialog(unit)
         else:
-            self._clear_selection()
+            self.details_label.setText("No vessel selected")
+            self.intercept_btn.setEnabled(False)
+            self.mark_safe_btn.setEnabled(False)
+            self.mark_threat_btn.setEnabled(False)
+
         self.update_display()
+
 
     def _clear_selection(self):
         self.details_label.setText("No vessel selected")
@@ -956,10 +1026,40 @@ class SimulationWindow(QMainWindow):
         self.mark_threat_btn.setEnabled(False)
         self.distress_btn.setEnabled(False)
 
+
+    
+
+
+    # --- Replace intercept_vessel in SimulationWindow ---
     def intercept_vessel(self):
-        _ = self.controller.intercept_vessel()
-        self._clear_selection()
+        unit = self.controller.selected_unit
+        if not unit:
+            self.details_label.setText("No vessel selected")
+            return
+
+        distance = self.controller.get_distance(self.controller.player_ship, unit)
+        if distance > self.controller.INTERCEPT_RANGE:
+            self.details_label.setText("Target is out of intercept range.")
+            return
+
+        # Pop up the hail / communication dialog. This returns True if the contact's reply
+        # made it suspicious (dialog logic handles reply selection).
+        is_suspicious = self.show_hail_dialog(unit)
+
+        # Based on hail/communication result, either intercept or mark safe.
+        if is_suspicious:
+            was_correct, true_threat, message = self.controller.intercept_vessel()
+            self.details_label.setText(f"Intercept result: {message}")
+        else:
+            was_correct, true_threat, message = self.controller.mark_safe()
+            self.details_label.setText(f"Vessel released as SAFE. {message}")
+
+        # disable buttons and refresh display
+        self.intercept_btn.setEnabled(False)
+        self.mark_safe_btn.setEnabled(False)
+        self.mark_threat_btn.setEnabled(False)
         self.update_display()
+
 
     def mark_safe(self):
         _ = self.controller.mark_safe()
