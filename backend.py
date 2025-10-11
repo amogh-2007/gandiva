@@ -1,4 +1,5 @@
 """
+THIS IS ADDES
 backend.py - Backend logic for Naval Combat Simulation
 Handles ML, AI, and simulation logic with all requested features
 """
