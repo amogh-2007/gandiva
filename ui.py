@@ -558,7 +558,42 @@ class SimulationWindow(QMainWindow):
         self.setup_controls()
         self.setup_timer()
         self.update_display()
+                # --- Zoom state (auto zoom in-zone vs out-of-zone) ---
+        self.current_zoom = 1.0
+        self.target_zoom = 1.0
+        self.zoom_min = 0.8     # zoom-out when outside zone
+        self.zoom_max = 1.6     # zoom-in when inside zone
+        self.zoom_step = 0.02   # smoothness per tick (increase for faster zoom)
+
+        # Initialize transform
+        self._apply_zoom(self.current_zoom)
+
+        # Timer for smooth zoom animation (~60 FPS)
+        self.zoom_timer = QTimer()
+        self.zoom_timer.timeout.connect(self._animate_zoom)
+        self.zoom_timer.start(16)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+    def _apply_zoom(self, factor: float):
+        # Reset transform to identity, then apply scale
+        if not self.view.transform().isIdentity():
+            self.view.resetTransform()
+        self.view.scale(factor, factor)
+
+    def _animate_zoom(self):
+        # If nearly at target, snap and stop adjusting
+        if abs(self.current_zoom - self.target_zoom) < 1e-3:
+            self.current_zoom = self.target_zoom
+            self._apply_zoom(self.current_zoom)
+            return
+
+        # Move smoothly toward target
+        if self.current_zoom < self.target_zoom:
+            self.current_zoom = min(self.current_zoom + self.zoom_step, self.target_zoom)
+        else:
+            self.current_zoom = max(self.current_zoom - self.zoom_step, self.target_zoom)
+
+        self._apply_zoom(self.current_zoom)
 
     def setup_side_panel(self):
         side_frame = QFrame()
@@ -974,6 +1009,15 @@ class SimulationWindow(QMainWindow):
         self.controller.update_simulation()
         zone_text = "ENTERED" if self.controller.is_in_patrol_zone() else "APPROACHING"
         self.status_label.setText(f"Status: {zone_text} Patrol Zone\nUse WASD to navigate")
+
+        # --- Set zoom target based on zone presence ---
+        if self.controller.is_in_patrol_zone():
+            if self.target_zoom != self.zoom_max:
+                self.target_zoom = self.zoom_max
+        else:
+            if self.target_zoom != self.zoom_min:
+                self.target_zoom = self.zoom_min
+
         self.update_display()
 
     def toggle_pause(self):
