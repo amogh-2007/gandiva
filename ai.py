@@ -1,6 +1,7 @@
+# ai.py - FIXED VERSION
 """
-Naval Combat AI Engine with Advanced Reinforcement Learning and Realistic Behaviors
-FIXED VERSION - Corrected training methods and shape handling
+Naval Combat AI Engine - FIXED VERSION
+Fixed array boolean evaluation error
 """
 
 import numpy as np
@@ -70,22 +71,28 @@ class DQNetwork:
         
         # FIXED: Proper sample_weights handling
         if sample_weights is not None:
-            # Reshape sample_weights for broadcasting
-            sample_weights = sample_weights.reshape(-1, 1)
-            if sample_weights.shape[0] != predictions.shape[0]:
-                sample_weights = np.ones_like(predictions)
-            
-            # Calculate weighted loss
-            errors = predictions - targets
-            weighted_errors = sample_weights * errors
-            loss = np.mean(weighted_errors ** 2)
+            # Check if sample_weights has elements using len() instead of boolean evaluation
+            if hasattr(sample_weights, '__len__') and len(sample_weights) > 0:
+                # Reshape sample_weights for broadcasting
+                sample_weights = sample_weights.reshape(-1, 1)
+                if sample_weights.shape[0] != predictions.shape[0]:
+                    logger.warning(f"Sample weights shape mismatch: {sample_weights.shape[0]} vs {predictions.shape[0]}")
+                    sample_weights = np.ones_like(predictions)
+                
+                # Calculate weighted loss
+                errors = predictions - targets
+                weighted_errors = sample_weights * errors
+                loss = np.mean(weighted_errors ** 2)
+            else:
+                errors = predictions - targets
+                loss = np.mean(errors ** 2)
         else:
             errors = predictions - targets
             loss = np.mean(errors ** 2)
         
         # Simple gradient descent update (mock implementation)
         learning_rate = 0.001
-        if sample_weights is not None:
+        if sample_weights is not None and hasattr(sample_weights, '__len__') and len(sample_weights) > 0:
             gradient = 2 * np.dot(states.T, weighted_errors) / len(states)
         else:
             gradient = 2 * np.dot(states.T, errors) / len(states)
@@ -136,7 +143,7 @@ class PrioritizedReplayBuffer:
         
         # Calculate importance sampling weights
         weights = (len(self.memory) * probs[indices]) ** (-self.beta)
-        if weights.max() > 0:
+        if hasattr(weights, '__len__') and len(weights) > 0 and weights.max() > 0:
             weights /= weights.max()
         
         return samples, weights, indices
@@ -463,7 +470,7 @@ class NavalAI:
         return state_array
 
     def train_model(self):
-        """Enhanced training method with proper error handling."""
+        """FIXED: Training method with proper array handling."""
         try:
             minibatch, weights, indices = self.replay_buffer.sample(self.batch_size)
             if not minibatch:
@@ -496,8 +503,8 @@ class NavalAI:
             # Convert to arrays
             targets_array = np.array(targets)
             
-            # Handle weights
-            if len(weights) > 0 and len(weights) == len(states):
+            # FIXED: Use len() instead of boolean evaluation for arrays
+            if weights is not None and hasattr(weights, '__len__') and len(weights) > 0:
                 weights_array = np.array(weights)
             else:
                 weights_array = None
@@ -505,8 +512,8 @@ class NavalAI:
             # Train model
             loss = self.model.train_on_batch(states, targets_array, sample_weights=weights_array)
             
-            # Update priorities
-            if indices and td_errors:
+            # FIXED: Use len() instead of boolean evaluation for lists
+            if indices and td_errors and len(indices) > 0 and len(td_errors) > 0:
                 self.replay_buffer.update_priorities(indices, td_errors)
             
             return loss
