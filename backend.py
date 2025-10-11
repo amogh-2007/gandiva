@@ -457,19 +457,13 @@ class SimulationController:
                         v.items = list(det["items"])
                     if "weapons" in det:
                         v.weapons = list(det["weapons"])
-                    if "threat_level" in det:
-                        v.true_threat_level = det["threat_level"]
-                    if "velocity" in det:
-                        vx, vy = det["velocity"]
-                        v.set_velocity(float(vx), float(vy))
-            except Exception as e:
-                print(f"[DEBUG] AI generation error: {e}")
+            except:
+                pass
 
-        self._generated_vessels = True
         self._emit("boats_spawned", [v.to_dict() for v in spawned])
-        self.add_log(f"Spawned {len(spawned)} vessels in region.")
-        print(f"[DEBUG] Total units now: {len(self.units)}")
-        print(f"[DEBUG] Active vessels: {len([v for v in self.units if v.active])}")
+        self._generated_vessels = True
+        self.add_log(f"Generated {len(spawned)} vessels in patrol zone.")
+        print(f"[DEBUG] Total active units: {len([v for v in self.units if v.active])}")
         return spawned
 
     # ------------------------
@@ -809,8 +803,8 @@ class SimulationController:
             return "ERROR: No target vessel selected for distress call."
 
         target = self.selected_unit
-        nearby_threats = [v for v in self.units if v.active and v is not self.player_ship 
-                         and v.true_threat_level in ("possible", "confirmed")]
+        nearby_threats = [v for v in self.units if v.active and v is not self.player_ship
+                          and v.true_threat_level in ("possible", "confirmed")]
 
         report = f"""
 === DISTRESS CALL REPORT ===
