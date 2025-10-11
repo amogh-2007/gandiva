@@ -529,16 +529,57 @@ class SimulationController:
     def update_simulation(self):
         self._apply_key_velocity()
         self.player_ship.update_position(dt=1.0, bounds=(self.fleet.region_w, self.fleet.region_h))
+    # Extra clamp to prevent any overshoot at high dt or speeds
+        self.player_ship.x = max(0.0, min(self.fleet.region_w, self.player_ship.x))
+        self.player_ship.y = max(0.0, min(self.fleet.region_h, self.player_ship.y))
 
-        # Enhanced patrol phase logic with shrinking
-        if self.patrol_phase_active:
-            if (not self.in_patrol_zone) and self._patrol_in_zone():
-                self.in_patrol_zone = True
-                self.patrol_phase_active = False
-                self.paused = False
-                self._expand_zone()
-                self.generate_random_vessels(count=8)
-                return
+    # Always compute this before any zone logic
+        currently_in = self._patrol_in_zone()
+
+
+
+        # Fully dynamic zone handling: expand on enter/re-enter, shrink on exit
+# Expand on first enter or any re-enter of the original red zone
+        if currently_in and not getattr(self, "zone_expanded", False):
+            self.in_patrol_zone = True
+            self.patrol_phase_active = False
+            self.paused = False
+    # Remember original rect on first expansion only
+        if not hasattr(self, "original_zone_rect"):
+            self.original_zone_rect = self.zone_rect.copy()
+            self._expand_zone()
+
+    # Spawn only if very few active non-player vessels exist to avoid duplicates
+        active_non_player = [v for v in self.units if v.active and v is not self.player_ship]
+        if len(active_non_player) < 3:
+            self.generate_random_vessels(count=6)
+
+# Shrink when leaving the original red zone
+        elif (not currently_in) and getattr(self, "zone_expanded", False):
+            self.in_patrol_zone = False
+            self._shrink_zone()
+
+        
+
+
+# Enter or re-enter original zone → expand operational area
+        if currently_in and not getattr(self, "zone_expanded", False):
+            self.in_patrol_zone = True
+            self.patrol_phase_active = False
+            self.paused = False
+    # remember original rect on first expansion only
+        if not hasattr(self, "original_zone_rect"):
+            self.original_zone_rect = self.zone_rect.copy()
+            self._expand_zone()
+    # spawn only if very few active non-player vessels exist
+        active_non_player = [v for v in self.units if v.active and v is not self.player_ship]
+        if len(active_non_player) < 3:
+            self.generate_random_vessels(count=6)
+
+# Left original zone while expanded → shrink back to original
+        elif (not currently_in) and getattr(self, "zone_expanded", False):
+            self.in_patrol_zone = False
+            self._shrink_zone()
 
         # Handle zone shrinking when player moves out
         if not self.patrol_phase_active and self.in_patrol_zone:
