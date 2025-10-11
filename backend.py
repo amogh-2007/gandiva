@@ -190,8 +190,7 @@ class FleetManager:
             vy = math.sin(math.radians(heading)) * speed
             vtype = random.choice(["Fishing Boat", "Cargo Ship", "Speedboat", "Patrol Craft"])
             threat = random.choices(["neutral", "possible", "confirmed"], weights=[0.6, 0.3, 0.1])[0]
-            crew = random.randint(2, 25)
-            new_v = self.add_vessel(x=x, y=y, vx=vx, vy=vy, vessel_type=vtype, true_threat_level=threat, crew_count=crew)
+            new_v = self.add_vessel(x=x, y=y, vx=vx, vy=vy, vessel_type=vtype, true_threat_level=threat)
             spawned.append(new_v)
             existing_positions.append(np.array((x, y), dtype=float))
         return spawned
@@ -249,7 +248,7 @@ class SimulationController:
         self.zone_rect = {"x": 300, "y": 200, "width": 200, "height": 200}
 
         # player vessel: create and register via fleet
-        self.player_ship = Vessel(id=0, vessel_type="Player Vessel", x=100.0, y=100.0, vx=0.0, vy=0.0, speed=2.0, crew_count=5)
+        self.player_ship = Vessel(id=0, vessel_type="Player Vessel", x=100.0, y=100.0, vx=0.0, vy=0.0, speed=2.0)
         self.fleet.register_vessel(self.player_ship)
 
         # units is an ordered list used throughout UI (player first)
@@ -543,21 +542,6 @@ class SimulationController:
         else:
             self.add_log("Simulation resumed.")
         return self.paused
-    
-    def distress_call(self):
-        if not self.selected_unit:
-            return "No target for distress call."
-        
-        target = self.selected_unit
-        if target.crew_count > self.player_ship.crew_count * 1.5:
-            self.add_log(f"Distress call sent for vessel {target.id}. Backup is on the way.")
-            target.active = False # Simulate backup handling the threat
-            self.selected_unit = None
-            return f"Backup called for {target.vessel_type}. Threat neutralized."
-        else:
-            self.add_log(f"Distress call for vessel {target.id} denied. Threat is manageable.")
-            return f"Distress call denied. Engage target."
-
 
     # ------------------------
     # Interaction API (UI uses these)
@@ -582,9 +566,6 @@ class SimulationController:
         if not self.selected_unit:
             return False, None, "No vessel selected."
         target = self.selected_unit
-        if target.crew_count > self.player_ship.crew_count:
-            return False, target.true_threat_level, "Target too large to intercept alone. Call for backup."
-
         was_correct = (target.true_threat_level == "confirmed")
         message = f"Intercept action taken on {target.vessel_type} (id={target.id}). Actual: {target.true_threat_level}."
         # Mark vessel inactive (intercepted)
