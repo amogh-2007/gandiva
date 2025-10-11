@@ -240,7 +240,8 @@ class SimulationController:
         self.status_log: List[str] = []
         self.selected_unit: Optional[Vessel] = None
         self.game_over: bool = False
-        self.paused: bool = False
+        self.paused: bool = True
+        self.patrol_phase_active: bool = True
         self.in_patrol_zone: bool = False
 
         # zone rect used by ui.py
@@ -502,25 +503,26 @@ class SimulationController:
     def update_simulation(self):
         """Main per-frame update called by UI; computes velocities from key states,
         moves player, spawns region vessels when required, updates enemies, and emits tick."""
+        # 1) Always process player input and move the player ship
+        self._apply_key_velocity()
+        self.player_ship.update_position(dt=1.0, bounds=(self.fleet.region_w, self.fleet.region_h))
+
+        # 2) Handle the initial patrol phase logic
+        if self.patrol_phase_active:
+            if (not self.in_patrol_zone) and self._patrol_in_zone():
+                self.in_patrol_zone = True
+                self.patrol_phase_active = False # End the patrol phase
+                self.paused = False # Unpause the simulation
+                self._expand_zone()
+                self.generate_random_vessels(count=8)
+            return # During patrol phase, we only move the player and check for zone entry
+
+        # If we are past the patrol phase, check for pause/game over
         if self.paused or self.game_over:
             return
 
-        # 1) Apply player's held keys into velocity and move player
-        self._apply_key_velocity()
-        # move player (dt=1 to align with UI's 50ms timer -> units per tick)
-        self.player_ship.update_position(dt=1.0, bounds=(self.fleet.region_w, self.fleet.region_h))
-
-        # 2) check zone entry & expansion (once)
-        if (not self.in_patrol_zone) and self._patrol_in_zone():
-            self.in_patrol_zone = True
-            # expand zone & clear temp markers
-            self._expand_zone()
-            # spawn vessels on expansion (AI will handle augmentation if set)
-            self.generate_random_vessels(count=8)  # default count; tweak as needed
-
         # 3) update enemy movement and separation if region is expanded / vessels exist
         if self._generated_vessels:
-            # enemies adjust velocity and move
             self._update_enemy_movement(dt=1.0)
 
         # 4) threat state dynamics
@@ -532,6 +534,14 @@ class SimulationController:
 
         # 6) emit tick event
         self._emit("tick", None)
+        
+    def toggle_pause(self):
+        self.paused = not self.paused
+        if self.paused:
+            self.add_log("Simulation paused.")
+        else:
+            self.add_log("Simulation resumed.")
+        return self.paused
 
     # ------------------------
     # Interaction API (UI uses these)
@@ -627,6 +637,3 @@ class SimulationController:
                 "active": v.active
             })
         return out
-
-
-#testing over and out 

@@ -378,12 +378,11 @@ class SimulationWindow(QMainWindow):
     def __init__(self, mission_type="Patrol Boat"):
         super().__init__()
         self.mission_type = mission_type
-        self.patrol_phase_active = True
-
+        
         player_data = {"accuracy": 0.5, "reaction_time": 0.5}
         self.controller = SimulationController(mission_type, "novice", player_data)
-        self.controller.paused = True
-
+        self.patrol_phase_active = self.controller.patrol_phase_active
+        
         self.graphics_items = {}
 
         self.init_ui()
@@ -472,6 +471,7 @@ class SimulationWindow(QMainWindow):
         self.view.mousePressEvent = self.radar_click
         self.view.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.view.keyPressEvent = self.keyPressEvent
+        self.view.keyReleaseEvent = self.keyReleaseEvent
         radar_layout.addWidget(self.view)
 
         # Bottom command buttons
@@ -515,7 +515,7 @@ class SimulationWindow(QMainWindow):
         control_layout.setSpacing(10)
         control_layout.setContentsMargins(15, 15, 15, 15)
 
-        self.pause_btn = QPushButton("⏸ PAUSE")
+        self.pause_btn = QPushButton("▶ RESUME")
         self.pause_btn.setStyleSheet("""
             QPushButton {
                 font-size: 14px; padding: 12px; background-color: #64ffda;
@@ -670,18 +670,38 @@ class SimulationWindow(QMainWindow):
     def keyPressEvent(self, event):
         if self.controller.game_over:
             return
-            
-        # Allow movement even if paused, to get to the patrol zone
-        if event.key() == Qt.Key.Key_W:
-            self.controller.move_player('w')
-        elif event.key() == Qt.Key.Key_S:
-            self.controller.move_player('s')
-        elif event.key() == Qt.Key.Key_A:
-            self.controller.move_player('a')
-        elif event.key() == Qt.Key.Key_D:
-            self.controller.move_player('d')
+
+        key_map = {
+            Qt.Key.Key_W: 'w',
+            Qt.Key.Key_S: 's',
+            Qt.Key.Key_A: 'a',
+            Qt.Key.Key_D: 'd',
+            Qt.Key.Key_Up: 'w',
+            Qt.Key.Key_Down: 's',
+            Qt.Key.Key_Left: 'a',
+            Qt.Key.Key_Right: 'd',
+        }
+        if event.key() in key_map:
+            self.controller.set_key_state(key_map[event.key()], True)
         elif event.key() == Qt.Key.Key_Space:
             self.controller.move_player('space')
+
+    def keyReleaseEvent(self, event):
+        if self.controller.game_over:
+            return
+
+        key_map = {
+            Qt.Key.Key_W: 'w',
+            Qt.Key.Key_S: 's',
+            Qt.Key.Key_A: 'a',
+            Qt.Key.Key_D: 'd',
+            Qt.Key.Key_Up: 'w',
+            Qt.Key.Key_Down: 's',
+            Qt.Key.Key_Left: 'a',
+            Qt.Key.Key_Right: 'd',
+        }
+        if event.key() in key_map:
+            self.controller.set_key_state(key_map[event.key()], False)
 
     def update_display(self):
         for item_list in self.graphics_items.values():
@@ -701,7 +721,7 @@ class SimulationWindow(QMainWindow):
         zr = self.controller.zone_rect
         zone_item = QGraphicsRectItem(zr["x"], zr["y"], zr["width"], zr["height"])
         zone_item.setPen(QPen(QColor(255, 70, 70, 150), 2, Qt.PenStyle.DashLine))
-        if self.patrol_phase_active:
+        if self.controller.patrol_phase_active:
             zone_item.setBrush(QBrush(QColor(255, 70, 70, 20)))
         else:
             zone_item.setBrush(QBrush(Qt.BrushStyle.NoBrush))
@@ -722,7 +742,7 @@ class SimulationWindow(QMainWindow):
             self.graphics_items[0] = player_items
             
         # Conditionally draw other units if patrol phase is over
-        if not self.patrol_phase_active:
+        if not self.controller.patrol_phase_active:
             for idx, unit in enumerate(self.controller.units):
                 if not unit.active or unit == self.controller.player_ship:
                     continue
@@ -764,7 +784,7 @@ class SimulationWindow(QMainWindow):
         self.hostile_label.setText(f"{status['confirmed_threats']} HOSTILE")
 
     def radar_click(self, event):
-        if self.patrol_phase_active or not self.controller.in_patrol_zone:
+        if self.controller.patrol_phase_active or not self.controller.in_patrol_zone:
             self.controller.selected_unit = None
             self.details_label.setText("No vessel selected")
             self.intercept_btn.setEnabled(False)
@@ -825,31 +845,17 @@ class SimulationWindow(QMainWindow):
         self.update_display()
 
     def update_simulation(self):
-        # Manually update player ship position during the initial patrol phase
-        if self.patrol_phase_active and self.controller.paused:
-             player_ship = self.controller.player_ship
-             if player_ship:
-                 player_ship.x += player_ship.vx
-                 player_ship.y += player_ship.vy
-                 # Simple boundary check from backend
-                 player_ship.x = max(10, min(790, player_ship.x))
-                 player_ship.y = max(10, min(590, player_ship.y))
-
         if not self.controller.game_over:
-            # This will handle other units and logic once unpaused.
             self.controller.update_simulation()
         
         status = self.controller.get_status_info()
         
-        if self.patrol_phase_active:
-             if self.controller.in_patrol_zone:
-                self.patrol_phase_active = False
-                self.controller.paused = False
-                self.controller.add_log("Patrol zone reached. Engaging main simulation.")
-                self.pause_btn.setText("⏸ PAUSE")
-                # Expands the view to fit the entire scene
-                self.view.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatioByExpanding)
-        
+        # Check if the patrol phase just ended to update UI elements
+        if self.patrol_phase_active and not self.controller.patrol_phase_active:
+            self.patrol_phase_active = False
+            self.pause_btn.setText("⏸ PAUSE")
+            self.view.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatioByExpanding)
+
         if self.controller.in_patrol_zone:
             self.status_label.setText(
                 f"Status: In Patrol Zone\nConfirmed Threats: {status['confirmed_threats']}\n"
@@ -865,7 +871,7 @@ class SimulationWindow(QMainWindow):
             self.timer.stop()
 
     def toggle_pause(self):
-        if self.patrol_phase_active: return
+        if self.controller.patrol_phase_active: return
 
         paused = self.controller.toggle_pause()
         if paused:
@@ -907,4 +913,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
