@@ -122,94 +122,6 @@ class StatusLogWindow(QDialog):
             self.log_text.verticalScrollBar().maximum()
         )
 
-class CommunicateWindow(QDialog):
-    """Communications window showing nearby ships"""
-    def __init__(self, controller, parent=None):
-        super().__init__(parent)
-        self.controller = controller
-        self.setWindowTitle("Communications Link")
-        self.setGeometry(200, 200, 700, 500)
-        self.setStyleSheet("QDialog { background-color: #0a192f; }")
-
-        layout = QVBoxLayout()
-
-        title = QLabel("NEARBY VESSELS")
-        title.setStyleSheet("""
-            font-size: 16px; font-weight: bold; color: #64ffda; letter-spacing: 2px;
-            padding: 10px; background-color: #112240; border: 1px solid #64ffda;
-        """)
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
-
-        self.table = QTableWidget()
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["Vessel Type", "Distance (m)", "Threat Level", "Speed (kts)", "Heading (°)"])
-        self.table.setStyleSheet("""
-            QTableWidget {
-                background-color: #0a192f; color: #64ffda;
-                font-family: 'Courier New', monospace; font-size: 11px;
-                border: 2px solid #64ffda; gridline-color: #64ffda;
-            }
-            QHeaderView::section {
-                background-color: #112240; color: #64ffda; font-weight: bold;
-                padding: 5px; border: 1px solid #64ffda;
-            }
-            QTableWidget::item { padding: 5px; color: #ccd6f6 }
-            QTableWidget::item:selected { background-color: #1d3b53; }
-        """)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        layout.addWidget(self.table)
-        
-        btn_layout = QHBoxLayout()
-        
-        contact_button = QPushButton("CONTACT SELECTED VESSEL")
-        contact_button.setStyleSheet("""
-            QPushButton {
-                font-size: 12px; padding: 8px; background-color: #1d3b53;
-                color: #64ffda; border: 2px solid #64ffda; border-radius: 3px; font-weight: bold;
-            }
-            QPushButton:hover { background-color: #2c4a63; }
-        """)
-        btn_layout.addWidget(contact_button)
-
-
-        close_btn = QPushButton("CLOSE")
-        close_btn.setStyleSheet("""
-            QPushButton {
-                font-size: 12px; padding: 8px; background-color: #64ffda;
-                color: #0a192f; border: none; border-radius: 3px; font-weight: bold;
-            }
-            QPushButton:hover { background-color: #57d8c0; }
-        """)
-        close_btn.clicked.connect(self.close)
-        btn_layout.addWidget(close_btn)
-
-        layout.addLayout(btn_layout)
-        self.setLayout(layout)
-        self.update_ships()
-
-    def update_ships(self):
-        nearby = self.controller.get_nearby_ships()
-        self.table.setRowCount(len(nearby))
-
-        for i, ship in enumerate(nearby):
-            self.table.setItem(i, 0, QTableWidgetItem(ship['vessel_type']))
-            self.table.setItem(i, 1, QTableWidgetItem(f"{ship['distance']:.1f}"))
-
-            threat_item = QTableWidgetItem(ship['threat_level'].upper())
-            if ship['threat_level'] == 'confirmed':
-                threat_item.setForeground(QColor(255, 70, 70))
-            elif ship['threat_level'] == 'possible':
-                threat_item.setForeground(QColor(255, 255, 255))
-            elif ship['threat_level'] == 'neutral':
-                threat_item.setForeground(QColor(100, 255, 218))
-            else:
-                threat_item.setForeground(QColor(136, 146, 176))
-            self.table.setItem(i, 2, threat_item)
-
-            self.table.setItem(i, 3, QTableWidgetItem(f"{ship['speed']:.1f}"))
-            self.table.setItem(i, 4, QTableWidgetItem(f"{ship['heading']:.0f}"))
-
 class StatusReportWindow(QDialog):
     """Status report window showing placeholder backend data."""
     def __init__(self, controller, parent=None):
@@ -381,9 +293,10 @@ class SimulationWindow(QMainWindow):
         
         player_data = {"accuracy": 0.5, "reaction_time": 0.5}
         self.controller = SimulationController(mission_type, "novice", player_data)
-        self.patrol_phase_active = self.controller.patrol_phase_active
         
         self.graphics_items = {}
+        # A UI-only flag to track if we've done the one-time UI change after patrol phase.
+        self.patrol_phase_ui_updated = False
 
         self.init_ui()
 
@@ -481,17 +394,6 @@ class SimulationWindow(QMainWindow):
         button_layout.setSpacing(5)
         button_layout.setContentsMargins(10, 8, 10, 8)
 
-        comms_btn = QPushButton("Communicate")
-        comms_btn.setStyleSheet("""
-            QPushButton {
-                font-size: 10px; padding: 6px 10px; background-color: #112240;
-                color: #64ffda; border: 1px solid #64ffda; border-radius: 3px; letter-spacing: 1px;
-            }
-            QPushButton:hover { background-color: #1d3b53; }
-        """)
-        comms_btn.clicked.connect(self.show_communicate_window)
-        button_layout.addWidget(comms_btn)
-
         status_report_btn = QPushButton("Status Report")
         status_report_btn.setStyleSheet("""
             QPushButton {
@@ -535,6 +437,42 @@ class SimulationWindow(QMainWindow):
         self.status_label.setWordWrap(True)
         self.status_label.setMinimumHeight(70)
         control_layout.addWidget(self.status_label)
+
+        # Communications Panel
+        comms_frame = QFrame()
+        comms_frame.setStyleSheet("""
+            QFrame {
+                background-color: #1d3b53; border: 1px solid #64ffda;
+                border-radius: 3px; padding: 10px;
+            }
+        """)
+        comms_layout = QVBoxLayout(comms_frame)
+        comms_title = QLabel("COMMUNICATIONS")
+        comms_title.setStyleSheet("font-size: 12px; font-weight: bold; color: #64ffda; letter-spacing: 1px;")
+        comms_layout.addWidget(comms_title)
+        
+        self.comms_table = QTableWidget()
+        self.comms_table.setColumnCount(2)
+        self.comms_table.setHorizontalHeaderLabels(["Vessel", "Dist."])
+        self.comms_table.setStyleSheet("""
+            QTableWidget {
+                background-color: transparent; color: #ccd6f6;
+                font-family: 'Courier New', monospace; font-size: 10px;
+                border: none; gridline-color: #64ffda;
+            }
+            QHeaderView::section {
+                background-color: #112240; color: #64ffda; font-weight: bold;
+                padding: 4px; border: 1px solid #64ffda;
+            }
+            QTableWidget::item { padding: 4px; }
+            QTableWidget::item:selected { background-color: #2c4a63; }
+        """)
+        self.comms_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.comms_table.verticalHeader().hide()
+        comms_layout.addWidget(self.comms_table)
+        
+        control_layout.addWidget(comms_frame)
+
 
         # Vessel Details
         details_frame = QFrame()
@@ -614,6 +552,22 @@ class SimulationWindow(QMainWindow):
         self.mark_threat_btn.setEnabled(False)
         self.mark_threat_btn.clicked.connect(self.mark_as_threat)
         action_layout.addWidget(self.mark_threat_btn)
+
+        self.distress_btn = QPushButton("🚨 DISTRESS CALL")
+        self.distress_btn.setStyleSheet("""
+            QPushButton {
+                font-size: 11px; padding: 8px; background-color: #8b0000;
+                color: #ff4444; border: 2px solid #ff0000; border-radius: 3px;
+                font-weight: bold; letter-spacing: 1px;
+            }
+            QPushButton:hover { background-color: #a00000; }
+            QPushButton:disabled {
+                background-color: #2a2a2a; color: #555555; border-color: #333333;
+            }
+        """)
+        self.distress_btn.setEnabled(False)
+        self.distress_btn.clicked.connect(self.distress_call)
+        action_layout.addWidget(self.distress_btn)
         
         control_layout.addLayout(action_layout)
         
@@ -624,11 +578,6 @@ class SimulationWindow(QMainWindow):
         
         self.view.setFocus() # Set initial focus to the radar view
 
-    def show_communicate_window(self):
-        """Show communications link window"""
-        dialog = CommunicateWindow(self.controller, self)
-        dialog.exec()
-        
     def show_status_report_window(self):
         """Show status report window"""
         dialog = StatusReportWindow(self.controller, self)
@@ -681,7 +630,7 @@ class SimulationWindow(QMainWindow):
             Qt.Key.Key_Left: 'a',
             Qt.Key.Key_Right: 'd',
         }
-        if event.key() in key_map:
+        if not event.isAutoRepeat() and event.key() in key_map:
             self.controller.set_key_state(key_map[event.key()], True)
         elif event.key() == Qt.Key.Key_Space:
             self.controller.move_player('space')
@@ -700,7 +649,7 @@ class SimulationWindow(QMainWindow):
             Qt.Key.Key_Left: 'a',
             Qt.Key.Key_Right: 'd',
         }
-        if event.key() in key_map:
+        if not event.isAutoRepeat() and event.key() in key_map:
             self.controller.set_key_state(key_map[event.key()], False)
 
     def update_display(self):
@@ -782,6 +731,8 @@ class SimulationWindow(QMainWindow):
         status = self.controller.get_status_info()
         self.enemy_label.setText(f"Enemies Detected: {status['total_threats']}")
         self.hostile_label.setText(f"{status['confirmed_threats']} HOSTILE")
+        self.update_comms_panel()
+
 
     def radar_click(self, event):
         if self.controller.patrol_phase_active or not self.controller.in_patrol_zone:
@@ -790,6 +741,7 @@ class SimulationWindow(QMainWindow):
             self.intercept_btn.setEnabled(False)
             self.mark_safe_btn.setEnabled(False)
             self.mark_threat_btn.setEnabled(False)
+            self.distress_btn.setEnabled(False)
             return
 
         scene_pos = self.view.mapToScene(event.pos())
@@ -806,11 +758,13 @@ class SimulationWindow(QMainWindow):
             self.intercept_btn.setEnabled(in_intercept_range)
             self.mark_safe_btn.setEnabled(not is_suspicious)
             self.mark_threat_btn.setEnabled(is_suspicious)
+            self.distress_btn.setEnabled(True)
 
             threat_text = unit.threat_level.capitalize() if unit.scanned else "Unknown"
             details = (f"Type: {unit.vessel_type}\n"
                        f"Threat Level: {threat_text}\n"
                        f"Distance: {distance:.0f} m\n\n"
+                       f"Crew Size: {unit.crew_count}\n"
                        f"COMMUNICATION LOGGED.")
             self.details_label.setText(details)
         else:
@@ -818,6 +772,7 @@ class SimulationWindow(QMainWindow):
             self.intercept_btn.setEnabled(False)
             self.mark_safe_btn.setEnabled(False)
             self.mark_threat_btn.setEnabled(False)
+            self.distress_btn.setEnabled(False)
         self.update_display()
 
     def intercept_vessel(self):
@@ -826,6 +781,16 @@ class SimulationWindow(QMainWindow):
         self.intercept_btn.setEnabled(False)
         self.mark_safe_btn.setEnabled(False)
         self.mark_threat_btn.setEnabled(False)
+        self.distress_btn.setEnabled(False)
+        self.update_display()
+        
+    def distress_call(self):
+        message = self.controller.distress_call()
+        self.details_label.setText(message)
+        self.intercept_btn.setEnabled(False)
+        self.mark_safe_btn.setEnabled(False)
+        self.mark_threat_btn.setEnabled(False)
+        self.distress_btn.setEnabled(False)
         self.update_display()
 
     def mark_safe(self):
@@ -834,6 +799,7 @@ class SimulationWindow(QMainWindow):
         self.intercept_btn.setEnabled(False)
         self.mark_safe_btn.setEnabled(False)
         self.mark_threat_btn.setEnabled(False)
+        self.distress_btn.setEnabled(False)
         self.update_display()
 
     def mark_as_threat(self):
@@ -842,6 +808,7 @@ class SimulationWindow(QMainWindow):
         self.intercept_btn.setEnabled(False)
         self.mark_safe_btn.setEnabled(False)
         self.mark_threat_btn.setEnabled(False)
+        self.distress_btn.setEnabled(False)
         self.update_display()
 
     def update_simulation(self):
@@ -851,8 +818,8 @@ class SimulationWindow(QMainWindow):
         status = self.controller.get_status_info()
         
         # Check if the patrol phase just ended to update UI elements
-        if self.patrol_phase_active and not self.controller.patrol_phase_active:
-            self.patrol_phase_active = False
+        if not self.patrol_phase_ui_updated and not self.controller.patrol_phase_active:
+            self.patrol_phase_ui_updated = True
             self.pause_btn.setText("⏸ PAUSE")
             self.view.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatioByExpanding)
 
@@ -869,10 +836,23 @@ class SimulationWindow(QMainWindow):
         self.update_display()
         if self.controller.game_over:
             self.timer.stop()
+            
+    def update_comms_panel(self):
+        nearby = self.controller.get_nearby_ships()
+        self.comms_table.setRowCount(len(nearby))
+        for i, ship in enumerate(nearby):
+            self.comms_table.setItem(i, 0, QTableWidgetItem(ship['vessel_type']))
+            self.comms_table.setItem(i, 1, QTableWidgetItem(f"{ship['distance']:.0f}"))
+
 
     def toggle_pause(self):
-        if self.controller.patrol_phase_active: return
-
+        # Allow resume from initial pause, but not re-pausing during patrol phase
+        if self.controller.patrol_phase_active:
+            self.controller.paused = False # Start the simulation
+            self.pause_btn.setText("⏸ PAUSE")
+            self.view.setFocus()
+            return
+            
         paused = self.controller.toggle_pause()
         if paused:
             self.pause_btn.setText("▶ RESUME")
