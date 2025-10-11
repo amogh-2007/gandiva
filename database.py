@@ -1,163 +1,138 @@
-# database.py
+# database_manager.py
 import sqlite3
-from typing import List, Dict
+from datetime import datetime
 
-DB_FILE = "naval_sim.db"
+DB_FILE = "coastal_defender.db"
 
-def init_db():
-    """Create database and tables if they don't exist"""
-    conn = sqlite3.connect(DB_FILE)
+
+# ---------------------------
+# Connection Helper
+# ---------------------------
+def connect_db():
+    """Create and return a database connection."""
+    return sqlite3.connect(DB_FILE)
+
+
+# ---------------------------
+# Database Initialization
+# ---------------------------
+def initialize_db():
+    """Create tables if they don’t exist."""
+    conn = connect_db()
     c = conn.cursor()
 
-    # Table for boats
+    # Main boats table
     c.execute("""
     CREATE TABLE IF NOT EXISTS boats (
-        boat_id INTEGER PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
-        vessel_type TEXT,
-        threat_level TEXT,
+        type TEXT,
         x REAL,
         y REAL,
-        vx REAL,
-        vy REAL,
         speed REAL,
-        heading REAL,
-        status TEXT
+        direction REAL,
+        status TEXT,
+        threat_level REAL,
+        crew INTEGER,
+        cargo TEXT,
+        weapons TEXT
     )
     """)
 
-    # Table for crew
+    # Logs table for actions
     c.execute("""
-    CREATE TABLE IF NOT EXISTS crew (
-        crew_id INTEGER PRIMARY KEY,
+    CREATE TABLE IF NOT EXISTS simulation_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         boat_id INTEGER,
-        name TEXT,
-        rank TEXT,
-        FOREIGN KEY (boat_id) REFERENCES boats(boat_id)
-    )
-    """)
-
-    # Table for items/weapons
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS inventory (
-        item_id INTEGER PRIMARY KEY,
-        boat_id INTEGER,
-        item_name TEXT,
-        quantity INTEGER,
-        item_type TEXT,
-        FOREIGN KEY (boat_id) REFERENCES boats(boat_id)
-    )
-    """)
-
-    # Table to track simulation state (optional)
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS sim_state (
-        sim_id INTEGER PRIMARY KEY,
-        time_step INTEGER,
-        player_x REAL,
-        player_y REAL
+        action TEXT,
+        timestamp TEXT,
+        details TEXT,
+        FOREIGN KEY (boat_id) REFERENCES boats(id)
     )
     """)
 
     conn.commit()
     conn.close()
-    print("Database initialized.")
 
-# Helper functions
-def insert_boat(boat: Dict):
-    """Insert a new boat into the database"""
-    conn = sqlite3.connect(DB_FILE)
+
+# ---------------------------
+# Boat Operations
+# ---------------------------
+def insert_boat(data: dict):
+    """Insert a new boat record."""
+    conn = connect_db()
     c = conn.cursor()
     c.execute("""
-    INSERT INTO boats (name, vessel_type, threat_level, x, y, vx, vy, speed, heading, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO boats (name, type, x, y, speed, direction, status, threat_level, crew, cargo, weapons)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
-        boat.get("name"),
-        boat.get("vessel_type"),
-        boat.get("threat_level"),
-        boat.get("x"),
-        boat.get("y"),
-        boat.get("vx"),
-        boat.get("vy"),
-        boat.get("speed"),
-        boat.get("heading"),
-        boat.get("status", "active")
+        data.get("name"), data.get("type"), data.get("x"), data.get("y"),
+        data.get("speed"), data.get("direction"), data.get("status"),
+        data.get("threat_level"), data.get("crew"), data.get("cargo"),
+        data.get("weapons")
     ))
     conn.commit()
-    boat_id = c.lastrowid
-    conn.close()
-    return boat_id
-
-def update_boat_status(boat_id: int, status: str):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("UPDATE boats SET status=? WHERE boat_id=?", (status, boat_id))
-    conn.commit()
     conn.close()
 
-def get_boat(boat_id: int) -> Dict:
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("SELECT * FROM boats WHERE boat_id=?", (boat_id,))
-    row = c.fetchone()
-    conn.close()
-    if row:
-        keys = ["boat_id","name","vessel_type","threat_level","x","y","vx","vy","speed","heading","status"]
-        return dict(zip(keys, row))
-    return {}
 
-def get_all_boats() -> List[Dict]:
-    conn = sqlite3.connect(DB_FILE)
+def get_all_boats():
+    """Fetch all boats."""
+    conn = connect_db()
     c = conn.cursor()
     c.execute("SELECT * FROM boats")
-    rows = c.fetchall()
+    boats = c.fetchall()
     conn.close()
-    keys = ["boat_id","name","vessel_type","threat_level","x","y","vx","vy","speed","heading","status"]
-    return [dict(zip(keys, r)) for r in rows]
+    return boats
 
-def insert_crew(boat_id: int, crew_members: List[Dict]):
-    conn = sqlite3.connect(DB_FILE)
+
+def get_boat_by_id(boat_id: int):
+    """Fetch a specific boat by its ID."""
+    conn = connect_db()
     c = conn.cursor()
-    for member in crew_members:
-        c.execute("""
-        INSERT INTO crew (boat_id, name, rank)
-        VALUES (?, ?, ?)
-        """, (boat_id, member["name"], member["rank"]))
+    c.execute("SELECT * FROM boats WHERE id=?", (boat_id,))
+    boat = c.fetchone()
+    conn.close()
+    return boat
+
+
+def update_boat_position(boat_id: int, x: float, y: float):
+    """Update a boat’s position."""
+    conn = connect_db()
+    c = conn.cursor()
+    c.execute("UPDATE boats SET x=?, y=? WHERE id=?", (x, y, boat_id))
     conn.commit()
     conn.close()
 
-def insert_inventory(boat_id: int, items: List[Dict]):
-    conn = sqlite3.connect(DB_FILE)
+
+def update_boat_status(boat_id: int, new_status: str):
+    """Update a boat’s status (e.g., threat, suspect, good, intercepted)."""
+    conn = connect_db()
     c = conn.cursor()
-    for item in items:
-        c.execute("""
-        INSERT INTO inventory (boat_id, item_name, quantity, item_type)
+    c.execute("UPDATE boats SET status=? WHERE id=?", (new_status, boat_id))
+    conn.commit()
+    conn.close()
+
+
+def delete_boat(boat_id: int):
+    """Remove a boat (if destroyed or removed from zone)."""
+    conn = connect_db()
+    c = conn.cursor()
+    c.execute("DELETE FROM boats WHERE id=?", (boat_id,))
+    conn.commit()
+    conn.close()
+
+
+# ---------------------------
+# Logging System
+# ---------------------------
+def log_action(boat_id: int, action: str, details: str = ""):
+    """Log an event in the simulation (e.g., intercept, rescue)."""
+    conn = connect_db()
+    c = conn.cursor()
+    timestamp = datetime.now().isoformat(timespec="seconds")
+    c.execute("""
+        INSERT INTO simulation_logs (boat_id, action, timestamp, details)
         VALUES (?, ?, ?, ?)
-        """, (boat_id, item["item_name"], item["quantity"], item["item_type"]))
+    """, (boat_id, action, timestamp, details))
     conn.commit()
     conn.close()
-
-# Example usage
-if __name__ == "__main__":
-    init_db()
-
-    # Example boat
-    boat_data = {
-        "name": "HMS Test",
-        "vessel_type": "Patrol Boat",
-        "threat_level": "possible",
-        "x": 100,
-        "y": 150,
-        "vx": 1.2,
-        "vy": 0.5,
-        "speed": 2.0,
-        "heading": 45,
-    }
-
-    boat_id = insert_boat(boat_data)
-    print("Inserted boat with ID:", boat_id)
-
-    insert_crew(boat_id, [{"name":"John Doe","rank":"Captain"},{"name":"Jane Roe","rank":"Sailor"}])
-    insert_inventory(boat_id, [{"item_name":"Rifle","quantity":5,"item_type":"Weapon"}])
-
-    print(get_all_boats())
