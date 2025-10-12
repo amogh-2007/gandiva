@@ -14,6 +14,11 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QPushButton,
 from PyQt6.QtCore import QTimer, Qt, QPointF
 from PyQt6.QtGui import QBrush, QColor, QPen, QPolygonF, QPainter, QLinearGradient, QGradient
 from backend import SimulationController
+import logging  # Add this import
+
+# Set up logging for UI
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # ENHANCED POPUP WINDOWS
@@ -720,19 +725,48 @@ class SimulationWindow(QMainWindow):
 
         return bottom_frame
     
-    def show_communication_dialog(self, unit):
-        """Open a communication channel popup with the selected vessel."""
-        dialog = QDialog(self)
-        dialog.setWindowTitle(f"Communicate with {unit.vessel_type} (ID {unit.id})")
-        dialog.setModal(True)
-        dialog.resize(400, 300)
+# In ui.py - Enhance the show_communication_dialog method
+def show_communication_dialog(self, unit):
+    """Open a communication channel popup with AI-enhanced responses."""
+    dialog = QDialog(self)
+    dialog.setWindowTitle(f"Communicate with {unit.vessel_type} (ID {unit.id})")
+    dialog.setModal(True)
+    dialog.resize(500, 400)
+    dialog.setStyleSheet("QDialog { background-color: #0a192f; color: #64ffda; }")
 
-        layout = QVBoxLayout(dialog)
+    layout = QVBoxLayout(dialog)
 
-        # Info label
-        info_label = QLabel(f"You have opened a channel with {unit.vessel_type}.\n"
-                        "Type a message or warning below:")
-        layout.addWidget(info_label)
+    # Info label with AI analysis
+    info_text = f"""
+VESSEL: {unit.vessel_type}
+DISTANCE: {self.controller.get_distance(self.controller.player_ship, unit):.0f}m
+THREAT LEVEL: {unit.true_threat_level.upper()}
+CREW: {unit.crew_count}
+    """
+    
+    info_label = QLabel(info_text)
+    info_label.setStyleSheet("font-size: 11px; color: #8892b0; padding: 10px; background-color: #112240;")
+    layout.addWidget(info_label)
+
+    # AI Analysis section
+    if hasattr(self.controller, 'ai_initialized') and self.controller.ai_initialized:
+        try:
+            player_data = self.controller._convert_player_to_ai_format()
+            vessel_data = self.controller._convert_vessel_to_ai_format({
+                'id': unit.id, 'x': unit.x, 'y': unit.y,
+                'speed': unit.speed, 'heading': unit.heading,
+                'vessel_type': unit.vessel_type,
+                'true_threat_level': unit.true_threat_level
+            })
+            
+            ai_report = self.controller.ai.decide_action(vessel_data, player_data)
+            
+            ai_analysis = QLabel(f"🤖 AI ASSESSMENT:\nConfidence: {ai_report.confidence:.1%}\nRecommendation: {ai_report.recommended_action.value}\n\nReasoning: {ai_report.reasoning}")
+            ai_analysis.setStyleSheet("font-size: 10px; color: #64ffda; padding: 8px; background-color: #1d3b53; border: 1px solid #64ffda;")
+            ai_analysis.setWordWrap(True)
+            layout.addWidget(ai_analysis)
+        except Exception as e:
+            logger.warning(f"AI analysis failed: {e}")
 
         # Text input area
         input_box = QTextEdit()

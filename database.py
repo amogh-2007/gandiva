@@ -503,6 +503,19 @@ def get_performance_history(session_id: str = None) -> List[Dict[str, Any]]:
     
     return metrics
 
+def validate_vessel_schema(vessel_data: Dict) -> bool:
+    """Validate vessel data matches expected schema."""
+    required_fields = ['vessel_type', 'x', 'y', 'true_threat_level']
+    optional_fields = ['vx', 'vy', 'speed', 'heading', 'threat_level', 'scanned', 
+                      'active', 'distance_from_patrol', 'crew_count', 'items', 
+                      'weapons', 'detection_range', 'aggressiveness', 'evasion_chance', 'behavior']
+    
+    for field in required_fields:
+        if field not in vessel_data:
+            return False
+    
+    return True
+
 # ---------------------------------------------------
 # 📡 COMMUNICATION LOG FUNCTIONS
 # ---------------------------------------------------

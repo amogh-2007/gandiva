@@ -10,6 +10,11 @@ import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, Callable, Any
 import numpy as np
+import logging  # Add this import
+
+# Set up logging for backend
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------
 # Vessel dataclass
@@ -244,6 +249,17 @@ class SimulationController:
         # Load existing vessels from database
         self.load_vessels_from_database()
 
+        # AI Integration
+        try:
+            from ai import NavalAI
+            self.ai = NavalAI(backend=self)
+            self.ai_initialized = True
+            logger.info("AI system initialized")
+        except Exception as e:
+            self.ai = None
+            self.ai_initialized = False
+            logger.warning(f"AI initialization failed: {e}")
+
 
         self.mission_type = mission_type
         self.difficulty = difficulty
@@ -322,6 +338,40 @@ class SimulationController:
         for vessel in self.units:
             vessel_data = vessel.to_dict()
             self.database.save_vessel(vessel_data)
+
+def update_ai_controlled_vessels(self):
+    """Update NPC vessel behavior using AI"""
+    if not self.ai_initialized or not self.ai:
+        return
+    
+    player_data = self._convert_player_to_ai_format()
+    
+    for vessel in self.units:
+        if vessel is self.player_ship or not vessel.active:
+            continue
+        
+        # Convert vessel to AI format
+        vessel_data = {
+            'id': vessel.id, 'x': vessel.x, 'y': vessel.y,
+            'speed': vessel.speed, 'heading': vessel.heading,
+            'vessel_type': vessel.vessel_type,
+            'true_threat_level': vessel.true_threat_level,
+            'evasion_chance': getattr(vessel, 'evasion_chance', 0.1),
+            'detection_range': getattr(vessel, 'detection_range', 200)
+        }
+        
+        # Get AI-controlled movement
+        dx, dy = self.ai.control_npc_behavior(
+            vessel_data, 
+            (self.player_ship.x, self.player_ship.y)
+        )
+        
+        # Apply movement
+        vessel.vx = dx
+        vessel.vy = dy
+        vessel.speed = math.hypot(dx, dy)
+        if vessel.speed > 0:
+            vessel.heading = math.degrees(math.atan2(dy, dx)) % 360
 
     def on(self, event_name: str, cb: Callable[..., None]):
         if event_name not in self._listeners:
@@ -677,41 +727,38 @@ class SimulationController:
 
     # FIXED: Simulation update with proper zone management
     # --- Replace update_simulation with the version that collapses when leaving expanded zone ---
-    def update_simulation(self):
-        """Main per-frame update called by UI."""
-        if self.paused or self.game_over:
-            return
+def update_simulation(self):
+    """Main per-frame update called by UI."""
+    if self.paused or self.game_over:
+        return
 
-        # 1) Apply player's held keys into velocity and move player
-        self._apply_key_velocity()
-        self.player_ship.update_position(dt=1.0, bounds=(self.fleet.region_w, self.fleet.region_h))
+    # 1) Apply player's held keys into velocity and move player
+    self._apply_key_velocity()
+    self.player_ship.update_position(dt=1.0, bounds=(self.fleet.region_w, self.fleet.region_h))
 
-        # 2) handle entering original small zone -> expand once
-        if (not self.in_patrol_zone) and self._player_inside_original_zone():
-            self.in_patrol_zone = True
-            self._expand_zone()
-            self.generate_random_vessels(count=8)
+    # 2) Update AI-controlled vessel behavior
+    if self.ai_initialized:
+        self.update_ai_controlled_vessels()
 
-        # 2b) handle leaving expanded zone -> collapse back
-        if self.zone_expanded and (not self._player_inside_expanded_zone()):
-            # player left the expanded area -> collapse and return to patrol
-            self._collapse_zone()
-            # leaving expanded means player probably outside the original small zone too
-            self.in_patrol_zone = False
+    # 3) Handle zone transitions
+    if (not self.in_patrol_zone) and self._player_inside_original_zone():
+        self.in_patrol_zone = True
+        self._expand_zone()
+        self.generate_random_vessels(count=8)
 
-        # 3) update enemy movement and separation if region is expanded / vessels exist
-        if self._generated_vessels:
-            self._update_enemy_movement(dt=1.0)
+    # 4) Update enemy movement and separation
+    if self._generated_vessels:
+        self._update_enemy_movement(dt=1.0)
 
-        # 4) threat state dynamics
-        self._update_threat_states()
+    # 5) Threat state dynamics
+    self._update_threat_states()
 
-        # 5) recompute distances
-        for v in self.units:
-            v.distance_from_patrol = self.get_distance(self.player_ship, v)
+    # 6) Recompute distances
+    for v in self.units:
+        v.distance_from_patrol = self.get_distance(self.player_ship, v)
 
-        # 6) emit tick event
-        self._emit("tick", None)
+    # 7) Emit tick event
+    self._emit("tick", None)
 
 
     def toggle_pause(self) -> bool:

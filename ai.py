@@ -21,39 +21,52 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 
-import database
+try:
+    import database as db_module
+    HAS_DATABASE = True
+except ImportError:
+    HAS_DATABASE = False
+    logger.warning("Database module not available, using fallback data")
 
 class AIDatabase:
     def get_boat(self, vessel_id):
-        vessel_data = database.get_vessel(vessel_id)
-        if vessel_data:
-            return vessel_data
-        else:
-            # Fallback with proper structure
-            return {
-                "x": 400, "y": 300, "speed": 5.0, "heading": 0,
-                "vessel_type": "Unknown", "behavior": "idle", 
-                "true_threat_level": "neutral", "evasion_chance": 0.1,
-                "detection_range": 200, "aggressiveness": 0.1,
-                "id": f"vessel_{vessel_id}"
-            }
+        if HAS_DATABASE:
+            try:
+                vessel_data = db_module.get_vessel(vessel_id)
+                if vessel_data:
+                    return vessel_data
+            except Exception as e:
+                logger.warning(f"Database error in get_boat: {e}")
+        
+        # Fallback with proper structure
+        return {
+            "x": 400, "y": 300, "speed": 5.0, "heading": 0,
+            "vessel_type": "Unknown", "behavior": "idle", 
+            "true_threat_level": "neutral", "evasion_chance": 0.1,
+            "detection_range": 200, "aggressiveness": 0.1,
+            "id": f"vessel_{vessel_id}"
+        }
     
     def get_sim_state(self, player_id):
-        # Get player vessel from database or return default
-        player_vessels = [v for v in database.load_vessels() if v.get('vessel_type') == 'Player Vessel']
-        if player_vessels:
-            return player_vessels[0]
-        else:
-            return {
-                "x": 400, "y": 300, "speed": 15, "heading": 0, 
-                "vessel_type": "Player Ship", "behavior": "command",
-                "true_threat_level": "neutral", "evasion_chance": 0.0,
-                "detection_range": 500, "aggressiveness": 0.0, 
-                "id": "player_1"
-            }
+        if HAS_DATABASE:
+            try:
+                # Get player vessel from database or return default
+                player_vessels = [v for v in db_module.load_vessels() if v.get('vessel_type') == 'Player Vessel']
+                if player_vessels:
+                    return player_vessels[0]
+            except Exception as e:
+                logger.warning(f"Database error in get_sim_state: {e}")
+        
+        return {
+            "x": 400, "y": 300, "speed": 15, "heading": 0, 
+            "vessel_type": "Player Ship", "behavior": "command",
+            "true_threat_level": "neutral", "evasion_chance": 0.0,
+            "detection_range": 500, "aggressiveness": 0.0, 
+            "id": "player_1"
+        }
 
-database = AIDatabase()
-
+# Create instance
+ai_database = AIDatabase()
 # --- Enhanced Deep Learning Framework ---
 class DQNetwork:
     """Enhanced Deep Q-Network with proper training."""
@@ -947,7 +960,7 @@ if __name__ == "__main__":
             print("✗ Scenario validation failed")
         
         # Get player vessel
-        player = database.get_sim_state("player1")
+        player = ai_database.get_sim_state("player1")
         
         # Test AI decisions for each vessel
         for i, vessel in enumerate(scenario[:3]):  # Test first 3 vessels
