@@ -950,7 +950,7 @@ CREW: {unit.crew_count}
             self.status_label.setText("No vessel selected to mark as threat")
             return
 
-        success, true_threat_level, message = self.controller.mark_as_threat()
+        success, true_threat_level, message = self.controller.mark_threat()
         
         if success:
             self.status_label.setText(message)
