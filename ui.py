@@ -9,11 +9,17 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QPushButton,
                              QComboBox, QLabel, QVBoxLayout, QHBoxLayout,
                              QGraphicsScene, QGraphicsView, QGraphicsEllipseItem,
                              QGraphicsPolygonItem, QFrame, QGraphicsRectItem,
+
                              QTextEdit, QDialog, QTableWidget,
                              QTableWidgetItem, QHeaderView, QSplitter)
 from PyQt6.QtCore import QTimer, Qt, QPointF
 from PyQt6.QtGui import QBrush, QColor, QPen, QPolygonF, QPainter, QLinearGradient, QGradient
 from backend import SimulationController
+import logging  # Add this import
+
+# Set up logging for UI
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # ENHANCED POPUP WINDOWS
@@ -535,8 +541,6 @@ class SimulationWindow(QMainWindow):
         self.view.setRenderHints(QPainter.RenderHint.Antialiasing | QPainter.RenderHint.SmoothPixmapTransform)
         self.view.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
         self.view.mousePressEvent = self.radar_click
-        self.view.keyPressEvent = self.key_press_event
-        self.view.keyReleaseEvent = self.key_release_event
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(self.view)
@@ -565,6 +569,7 @@ class SimulationWindow(QMainWindow):
         
         self.update_display()
         
+        # Set strong focus to receive key events
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
     def setup_side_panel(self):
@@ -664,7 +669,7 @@ class SimulationWindow(QMainWindow):
         layout.addStretch()
         return side_frame
 
-    def setup_action_buttons(self, layout):
+    def setup_action_buttons(self, parent_layout):
         action_frame = QFrame()
         action_layout = QVBoxLayout(action_frame)
 
@@ -680,7 +685,7 @@ class SimulationWindow(QMainWindow):
             }
         """
 
-        self.intercept_btn = QPushButton("🎯 INTERCEPT")
+        self.intercept_btn = QPushButton("INTERCEPT")
         self.intercept_btn.setStyleSheet(button_style)
         self.intercept_btn.setEnabled(False)
         self.intercept_btn.clicked.connect(self.intercept_vessel)
@@ -698,8 +703,8 @@ class SimulationWindow(QMainWindow):
         self.mark_threat_btn.clicked.connect(self.mark_as_threat)
         action_layout.addWidget(self.mark_threat_btn)
 
-        layout.addWidget(action_frame)
-
+        parent_layout.addWidget(action_frame)
+        
     def setup_bottom_panel(self):
         bottom_frame = QFrame()
         bottom_frame.setStyleSheet("""
@@ -720,53 +725,6 @@ class SimulationWindow(QMainWindow):
 
         return bottom_frame
     
-    def show_communication_dialog(self, unit):
-        """Open a communication channel popup with the selected vessel."""
-        dialog = QDialog(self)
-        dialog.setWindowTitle(f"Communicate with {unit.vessel_type} (ID {unit.id})")
-        dialog.setModal(True)
-        dialog.resize(400, 300)
-
-        layout = QVBoxLayout(dialog)
-
-        # Info label
-        info_label = QLabel(f"You have opened a channel with {unit.vessel_type}.\n"
-                        "Type a message or warning below:")
-        layout.addWidget(info_label)
-
-        # Text input area
-        input_box = QTextEdit()
-        input_box.setPlaceholderText("e.g. Identify yourself, state your intentions...")
-        layout.addWidget(input_box)
-
-        # Response area
-        response_label = QLabel("Response will appear here.")
-        layout.addWidget(response_label)
-
-        # Buttons
-        button_row = QHBoxLayout()
-        send_button = QPushButton("Send")
-        close_button = QPushButton("Close Channel")
-        button_row.addWidget(send_button)
-        button_row.addWidget(close_button)
-        layout.addLayout(button_row)
-
-        # Handle send
-        def handle_send():
-            msg = input_box.toPlainText().strip()
-            if not msg:
-                response_label.setText("⚠️ Please type a message first.")
-                return
-
-            # ✅ Backend handles the AI response
-            reply = self.controller.respond_to_communication(unit.id, msg)
-            response_label.setText(f"📡 Response: {reply}")
-
-        send_button.clicked.connect(handle_send)
-        close_button.clicked.connect(dialog.accept)
-
-        dialog.exec()
-
     def setup_communication_section(self):
         comm_frame = QFrame()
         comm_layout = QVBoxLayout(comm_frame)
@@ -841,35 +799,105 @@ class SimulationWindow(QMainWindow):
 
     def setup_controls(self):
         self.pause_btn.clicked.connect(self.toggle_pause)
-        self.view.setFocus()
 
     def setup_timer(self):
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_simulation)
         self.timer.start(50)
 
-    def key_press_event(self, event):
+    def keyPressEvent(self, event):
+        """Handle key press events for the main window."""
         key_map = {
             Qt.Key.Key_W: "w", Qt.Key.Key_A: "a",
             Qt.Key.Key_S: "s", Qt.Key.Key_D: "d",
             Qt.Key.Key_Space: "space"
         }
-        if event.key() in key_map:
-            if key_map[event.key()] == "space":
-                self.controller.stop_player_movement()
-            else:
-                self.controller.set_key_state(key_map[event.key()], True)
+        if not event.isAutoRepeat():
+            if event.key() in key_map:
+                if key_map[event.key()] == "space":
+                    self.controller.stop_player_movement()
+                else:
+                    self.controller.set_key_state(key_map[event.key()], True)
         event.accept()
 
-    def key_release_event(self, event):
+    def keyReleaseEvent(self, event):
+        """Handle key release events for the main window."""
         key_map = {
             Qt.Key.Key_W: "w", Qt.Key.Key_A: "a",
             Qt.Key.Key_S: "s", Qt.Key.Key_D: "d"
         }
-        if event.key() in key_map:
-            self.controller.set_key_state(key_map[event.key()], False)
+        if not event.isAutoRepeat():
+            if event.key() in key_map:
+                self.controller.set_key_state(key_map[event.key()], False)
         event.accept()
 
+    def show_communication_dialog(self, unit):
+        """Open a communication channel popup with AI-enhanced responses."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"Communicate with {unit.vessel_type} (ID {unit.id})")
+        dialog.setModal(True)
+        dialog.resize(500, 400)
+        dialog.setStyleSheet("QDialog { background-color: #0a192f; color: #64ffda; }")
+
+        layout = QVBoxLayout(dialog)
+
+        info_text = f"""
+VESSEL: {unit.vessel_type}
+DISTANCE: {self.controller.get_distance(self.controller.player_ship, unit):.0f}m
+THREAT LEVEL: {unit.true_threat_level.upper()}
+CREW: {unit.crew_count}
+        """
+        
+        info_label = QLabel(info_text)
+        info_label.setStyleSheet("font-size: 11px; color: #8892b0; padding: 10px; background-color: #112240;")
+        layout.addWidget(info_label)
+
+        if hasattr(self.controller, 'ai_initialized') and self.controller.ai_initialized:
+            try:
+                player_data = self.controller._convert_player_to_ai_format()
+                vessel_data = self.controller._convert_vessel_to_ai_format({
+                    'id': unit.id, 'x': unit.x, 'y': unit.y,
+                    'speed': unit.speed, 'heading': unit.heading,
+                    'vessel_type': unit.vessel_type,
+                    'true_threat_level': unit.true_threat_level
+                })
+                
+                ai_report = self.controller.ai.decide_action(vessel_data, player_data)
+                
+                ai_analysis = QLabel(f"🤖 AI ASSESSMENT:\nConfidence: {ai_report.confidence:.1%}\nRecommendation: {ai_report.recommended_action.value}\n\nReasoning: {ai_report.reasoning}")
+                ai_analysis.setStyleSheet("font-size: 10px; color: #64ffda; padding: 8px; background-color: #1d3b53; border: 1px solid #64ffda;")
+                ai_analysis.setWordWrap(True)
+                layout.addWidget(ai_analysis)
+            except Exception as e:
+                logger.warning(f"AI analysis failed: {e}")
+
+        input_box = QTextEdit()
+        input_box.setPlaceholderText("e.g. Identify yourself, state your intentions...")
+        layout.addWidget(input_box)
+
+        response_label = QLabel("Response will appear here.")
+        layout.addWidget(response_label)
+
+        button_row = QHBoxLayout()
+        send_button = QPushButton("Send")
+        close_button = QPushButton("Close Channel")
+        button_row.addWidget(send_button)
+        button_row.addWidget(close_button)
+        layout.addLayout(button_row)
+
+        def handle_send():
+            msg = input_box.toPlainText().strip()
+            if not msg:
+                response_label.setText("⚠️ Please type a message first.")
+                return
+            reply = self.controller.respond_to_communication(unit.id, msg)
+            response_label.setText(f"📡 Response: {reply}")
+
+        send_button.clicked.connect(handle_send)
+        close_button.clicked.connect(dialog.accept)
+
+        dialog.exec()
+    
     def open_communication_window(self):
         comm_window = CommunicationWindow(self.controller, self)
         comm_window.exec()
@@ -895,14 +923,113 @@ class SimulationWindow(QMainWindow):
         report_window = StatusReportWindow(self.controller, self)
         report_window.exec()
 
+    def mark_safe(self):
+        """Mark the selected vessel as safe"""
+        if not self.controller.selected_unit:
+            self.status_label.setText("No vessel selected to mark as safe")
+            return
+
+        success, true_threat_level, message = self.controller.mark_safe()
+        
+        if success:
+            self.status_label.setText(message)
+            self.mark_safe_btn.setEnabled(False)
+            self.mark_threat_btn.setEnabled(False)
+            self.intercept_btn.setEnabled(True)
+            
+            if true_threat_level == "friendly":
+                self.details_label.setText(f"Vessel correctly identified as {true_threat_level}")
+            else:
+                self.details_label.setText(f"Warning: Vessel was actually {true_threat_level}")
+        else:
+            self.status_label.setText("Failed to mark vessel as safe: " + message)
+
+    def mark_as_threat(self):
+        """Mark the selected vessel as a threat"""
+        if not self.controller.selected_unit:
+            self.status_label.setText("No vessel selected to mark as threat")
+            return
+
+        success, true_threat_level, message = self.controller.mark_as_threat()
+        
+        if success:
+            self.status_label.setText(message)
+            self.mark_safe_btn.setEnabled(False)
+            self.mark_threat_btn.setEnabled(False)
+            self.intercept_btn.setEnabled(True)
+            
+            if true_threat_level == "hostile":
+                self.distress_btn.setEnabled(True)
+                self.distress_status.setText("⚠️ Hostile vessel detected - Distress available")
+                self.details_label.setText(f"Vessel correctly identified as {true_threat_level}")
+            else:
+                self.details_label.setText(f"Warning: Vessel was actually {true_threat_level}")
+        else:
+            self.status_label.setText("Failed to mark vessel as threat: " + message)
+    
+    def intercept_vessel(self):
+        """Handles interception of selected vessel with AI-enhanced decision support"""
+        if not self.controller.selected_unit:
+            self.status_label.setText("No vessel selected for interception")
+            return
+            
+        target = self.controller.selected_unit
+        distance = self.controller.get_distance(self.controller.player_ship, target)
+        
+        if distance > 100:  # 100 units as interception range
+            self.status_label.setText("Target out of interception range. Move closer.")
+            return
+            
+        threat_assessment = "Unknown"
+        confidence = 0.0
+        if hasattr(self.controller, 'ai_initialized') and self.controller.ai_initialized:
+            try:
+                player_data = self.controller._convert_player_to_ai_format()
+                vessel_data = self.controller._convert_vessel_to_ai_format({
+                    'id': target.id, 'x': target.x, 'y': target.y,
+                    'speed': target.speed, 'heading': target.heading,
+                    'vessel_type': target.vessel_type,
+                    'true_threat_level': target.true_threat_level
+                })
+                ai_report = self.controller.ai.decide_action(vessel_data, player_data)
+                threat_assessment = ai_report.recommended_action.value
+                confidence = ai_report.confidence
+            except Exception as e:
+                logger.warning(f"AI analysis failed during interception: {e}")
+        
+        result = self.controller.intercept_vessel(target.id)
+        
+        if result['success']:
+            status = f"Intercepted {target.vessel_type}\n"
+            status += f"Threat Assessment: {threat_assessment}\n"
+            if confidence > 0:
+                status += f"AI Confidence: {confidence:.1%}"
+            self.status_label.setText(status)
+            
+            self.intercept_btn.setEnabled(False)
+            self.mark_safe_btn.setEnabled(True)
+            self.mark_threat_btn.setEnabled(True)
+            
+            if confidence > 0.8 and threat_assessment == "THREAT":
+                self.distress_btn.setEnabled(True)
+                self.distress_status.setText("⚠️ High threat detected - Distress available")
+        else:
+            self.status_label.setText(f"Interception failed: {result['message']}")
+
     def update_display(self):
         """FIXED: Update radar display - RED BOX ALWAYS VISIBLE and expands/shrinks"""
+        # Clear previous items from the scene
         for items in self.graphics_items.values():
             for item in items:
-                self.scene.removeItem(item)
+                if item.scene():
+                    self.scene.removeItem(item)
         self.graphics_items.clear()
+        
+        # Clear all but the grid lines
+        items_to_remove = [item for item in self.scene.items() if not isinstance(item, QGraphicsRectItem) and not isinstance(item, QGraphicsPolygonItem) and not isinstance(item, QGraphicsEllipseItem)]
+        for item in items_to_remove:
+            self.scene.removeItem(item)
 
-        # ALWAYS draw the zone (red box) - it expands and shrinks
         zone = self.controller.get_zone_info()
         zone_item = QGraphicsRectItem(zone["x"], zone["y"], zone["width"], zone["height"])
         zone_border = QColor(255, 70, 70, 255)
@@ -917,7 +1044,6 @@ class SimulationWindow(QMainWindow):
             is_player = vessel['is_player']
             
             if is_player:
-                # GREEN PLAYER BOAT
                 player_items = []
                 triangle = QPolygonF([QPointF(0, -15), QPointF(-10, 10), QPointF(10, 10)])
                 player_item = QGraphicsPolygonItem(triangle)
@@ -928,24 +1054,18 @@ class SimulationWindow(QMainWindow):
                 player_items.append(player_item)
                 self.graphics_items[vessel_id] = player_items
             elif not self.controller.is_patrol_phase_active():
-                # Other vessels - only show when in patrol zone
                 items = []
                 if vessel['scanned']:
                     if vessel['threat_level'] == "neutral":
-                        color = QColor(100, 255, 218)
-                        border = QColor(150, 255, 230)
+                        color, border = QColor(100, 255, 218), QColor(150, 255, 230)
                     elif vessel['threat_level'] == "possible":
-                        color = QColor(255, 255, 255)
-                        border = QColor(200, 200, 200)
+                        color, border = QColor(255, 255, 255), QColor(200, 200, 200)
                     elif vessel['threat_level'] == "confirmed":
-                        color = QColor(255, 70, 70)
-                        border = QColor(200, 50, 50)
+                        color, border = QColor(255, 70, 70), QColor(200, 50, 50)
                     else:
-                        color = QColor(136, 146, 176)
-                        border = QColor(100, 110, 140)
+                        color, border = QColor(136, 146, 176), QColor(100, 110, 140)
                 else:
-                    color = QColor(136, 146, 176)
-                    border = QColor(100, 110, 140)
+                    color, border = QColor(136, 146, 176), QColor(100, 110, 140)
                 
                 item = QGraphicsEllipseItem(-8, -8, 16, 16)
                 item.setBrush(QBrush(color))
@@ -977,15 +1097,10 @@ class SimulationWindow(QMainWindow):
         else:
             self.distress_status.setText("Select a vessel to enable emergency response")
 
-    # --- Replace radar_click in SimulationWindow ---
     def radar_click(self, event):
-        # Disallow selection during patrol-phase or when not in the patrol zone
         if self.controller.patrol_phase_active or not self.controller.in_patrol_zone:
             self.controller.selected_unit = None
-            self.details_label.setText("No vessel selected")
-            self.intercept_btn.setEnabled(False)
-            self.mark_safe_btn.setEnabled(False)
-            self.mark_threat_btn.setEnabled(False)
+            self._clear_selection()
             return
 
         scene_pos = self.view.mapToScene(event.pos())
@@ -995,29 +1110,21 @@ class SimulationWindow(QMainWindow):
             distance = self.controller.get_distance(self.controller.player_ship, unit)
             in_intercept_range = distance <= self.controller.INTERCEPT_RANGE
 
-            # Do NOT auto-hail on selection any more.
-            # Intercept button opens the hail/communication dialog before performing action.
             self.intercept_btn.setEnabled(in_intercept_range)
-
-            # Allow manual marking after selection
             self.mark_safe_btn.setEnabled(True)
             self.mark_threat_btn.setEnabled(True)
 
             threat_text = unit.threat_level.capitalize() if unit.scanned else "Unknown"
             details = (f"Type: {unit.vessel_type}\n"
-                   f"Threat Level: {threat_text}\n"
-                   f"Distance: {distance:.0f} m\n\n"
-                   f"Click INTERCEPT to hail / communicate.")
+                       f"Threat Level: {threat_text}\n"
+                       f"Distance: {distance:.0f} m\n\n"
+                       f"Click INTERCEPT to hail / communicate.")
             self.details_label.setText(details)
             self.show_communication_dialog(unit)
         else:
-            self.details_label.setText("No vessel selected")
-            self.intercept_btn.setEnabled(False)
-            self.mark_safe_btn.setEnabled(False)
-            self.mark_threat_btn.setEnabled(False)
+            self._clear_selection()
 
         self.update_display()
-
 
     def _clear_selection(self):
         self.details_label.setText("No vessel selected")
@@ -1025,50 +1132,8 @@ class SimulationWindow(QMainWindow):
         self.mark_safe_btn.setEnabled(False)
         self.mark_threat_btn.setEnabled(False)
         self.distress_btn.setEnabled(False)
-
-
-    
-
-
-    # --- Replace intercept_vessel in SimulationWindow ---
-    def intercept_vessel(self):
-        unit = self.controller.selected_unit
-        if not unit:
-            self.details_label.setText("No vessel selected")
-            return
-
-        distance = self.controller.get_distance(self.controller.player_ship, unit)
-        if distance > self.controller.INTERCEPT_RANGE:
-            self.details_label.setText("Target is out of intercept range.")
-            return
-
-        # Pop up the hail / communication dialog. This returns True if the contact's reply
-        # made it suspicious (dialog logic handles reply selection).
-        is_suspicious = self.show_hail_dialog(unit)
-
-        # Based on hail/communication result, either intercept or mark safe.
-        if is_suspicious:
-            was_correct, true_threat, message = self.controller.intercept_vessel()
-            self.details_label.setText(f"Intercept result: {message}")
-        else:
-            was_correct, true_threat, message = self.controller.mark_safe()
-            self.details_label.setText(f"Vessel released as SAFE. {message}")
-
-        # disable buttons and refresh display
-        self.intercept_btn.setEnabled(False)
-        self.mark_safe_btn.setEnabled(False)
-        self.mark_threat_btn.setEnabled(False)
-        self.update_display()
-
-
-    def mark_safe(self):
-        _ = self.controller.mark_safe()
-        self._clear_selection()
-        self.update_display()
-
-    def mark_as_threat(self):
-        _ = self.controller.mark_threat()
-        self._clear_selection()
+        if self.controller.selected_unit:
+             self.controller.selected_unit = None
         self.update_display()
 
     def update_simulation(self):
@@ -1079,17 +1144,16 @@ class SimulationWindow(QMainWindow):
         self.update_display()
 
     def toggle_pause(self):
-        if self.controller.is_patrol_phase_active():
-            self.controller.unpause()
-            self.pause_btn.setText("⏸ PAUSE")
-            self.view.setFocus()
-            return
-        paused = self.controller.toggle_pause()
-        if paused:
+        is_paused = self.controller.toggle_pause()
+        if is_paused:
+            self.timer.stop()
             self.pause_btn.setText("▶ RESUME")
+            self.status_label.setText("Simulation paused")
         else:
+            self.timer.start(50)
             self.pause_btn.setText("⏸ PAUSE")
-        self.view.setFocus()
+            self.status_label.setText("Simulation resumed")
+        self.setFocus() # Ensure window regains focus
 
 # =============================================================================
 # MAIN APPLICATION
