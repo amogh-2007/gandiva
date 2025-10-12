@@ -237,6 +237,12 @@ class HailMessageGenerator:
 class SimulationController:
     INTERCEPT_RANGE = 150
 
+    def get_intercept_range(self) -> float:
+        """Adaptive interception range based on patrol zone size."""
+        return 150 if not self.zone_expanded else 250
+
+
+
     def __init__(self, mission_type: str = "Patrol Boat", difficulty: str = "novice", player_data: Dict = None):
         self.mission_type = mission_type
         self.difficulty = difficulty
@@ -526,37 +532,47 @@ class SimulationController:
         return spawned
 
 
-    # FIXED: Enemy movement with boundary enforcement
     def _update_enemy_movement(self, dt: float = 1.0):
+        """Ensure AI vessels move naturally but stay within the current patrol zone."""
         active_enemies = [v for v in self.units if v.active and v is not self.player_ship]
-        n = len(active_enemies)
-        if n == 0:
+        if not active_enemies:
             return
 
-        for i, v in enumerate(active_enemies):
-            repel = np.array((0.0, 0.0), dtype=float)
-            pos_i = np.array((v.x, v.y), dtype=float)
+        zr = self.zone_rect
+        x_min, x_max = zr["x"], zr["x"] + zr["width"]
+        y_min, y_max = zr["y"], zr["y"] + zr["height"]
 
+        for i, v in enumerate(active_enemies):
+            # Add gentle random motion
+            wander_angle = random.uniform(0, 2 * math.pi)
+            wander_speed = random.uniform(0.3, self.enemy_max_speed)
+            vx, vy = math.cos(wander_angle) * wander_speed, math.sin(wander_angle) * wander_speed
+
+            # Repel slightly from other vessels
+            repel_x, repel_y = 0.0, 0.0
             for j, other in enumerate(active_enemies):
                 if i == j:
                     continue
-                pos_j = np.array((other.x, other.y), dtype=float)
-                vec = pos_i - pos_j
-                dist = np.linalg.norm(vec)
-                if dist == 0:
-                    repel += np.random.uniform(-0.5, 0.5, size=2)
-                elif dist < self.enemy_separation:
-                    repel += (vec / (dist + 1e-6)) * (self.enemy_separation - dist) * 0.06
+                dx, dy = v.x - other.x, v.y - other.y
+                dist = math.hypot(dx, dy)
+                if 0 < dist < self.enemy_separation:
+                    repel_x += dx / dist * 0.25
+                    repel_y += dy / dist * 0.25
 
-            wander = np.random.uniform(-0.03, 0.03, size=2)
-            new_vel = np.array((v.vx, v.vy), dtype=float) + (repel + wander) * 0.5
-            speed = np.linalg.norm(new_vel)
-            if speed > self.enemy_max_speed:
-                new_vel = (new_vel / speed) * self.enemy_max_speed
-            
-            v.vx, v.vy = float(new_vel[0]), float(new_vel[1])
-            v.update_position(dt=dt, bounds=(self.fleet.region_w, self.fleet.region_h))
-    
+            v.vx = vx + repel_x
+            v.vy = vy + repel_y
+            v.update_position(dt=dt)
+
+        # Keep the vessel strictly inside the current patrol zone
+            if v.x < x_min:
+                v.x, v.vx = x_min, abs(v.vx)
+            elif v.x > x_max:
+                v.x, v.vx = x_max, -abs(v.vx)
+            if v.y < y_min:
+               v.y, v.vy = y_min, abs(v.vy)
+            elif v.y > y_max:
+                v.y, v.vy = y_max, -abs(v.vy)
+
 
     def respond_to_communication(self, vessel_id: int, player_message: str) -> str:
         """

@@ -38,7 +38,7 @@ class CommunicationWindow(QDialog):
         layout = QVBoxLayout()
         layout.setSpacing(10)
 
-        title = QLabel("📡 VESSEL COMMUNICATION SYSTEM 📡")
+        title = QLabel("VESSEL COMMUNICATION SYSTEM")
         title.setStyleSheet("""
             font-size: 16px; font-weight: bold; color: #64ffda; letter-spacing: 2px;
             padding: 10px; background-color: #112240; border: 1px solid #64ffda;
@@ -90,17 +90,17 @@ class CommunicationWindow(QDialog):
 
         button_layout = QHBoxLayout()
 
-        hail_btn = QPushButton("📢 HAIL VESSEL")
+        hail_btn = QPushButton("HAIL VESSEL")
         hail_btn.setStyleSheet(self._btn_style())
         hail_btn.clicked.connect(self.hail_selected_vessel)
         button_layout.addWidget(hail_btn)
 
-        analyze_btn = QPushButton("🤖 AI ANALYSIS")
+        analyze_btn = QPushButton("AI ANALYSIS")
         analyze_btn.setStyleSheet(self._btn_style())
         analyze_btn.clicked.connect(self.ai_analyze_vessel)
         button_layout.addWidget(analyze_btn)
 
-        refresh_btn = QPushButton("🔄 REFRESH")
+        refresh_btn = QPushButton("REFRESH")
         refresh_btn.setStyleSheet(self._btn_style())
         refresh_btn.clicked.connect(self.refresh_vessel_list)
         button_layout.addWidget(refresh_btn)
@@ -200,13 +200,13 @@ class DistressReportDialog(QDialog):
 
     def __init__(self, report_text, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("🚨 DISTRESS CALL - THREAT REPORT 🚨")
+        self.setWindowTitle("DISTRESS CALL - THREAT REPORT")
         self.setGeometry(200, 100, 900, 700)
         self.setStyleSheet("QDialog { background-color: #0a192f; }")
 
         layout = QVBoxLayout()
 
-        title = QLabel("⚠️ DISTRESS CALL INITIATED ⚠️")
+        title = QLabel(" DISTRESS CALL INITIATED ")
         title.setStyleSheet("""
             font-size: 18px; font-weight: bold; color: #ff4444; letter-spacing: 2px;
             padding: 15px; background-color: #4a0000; border: 2px solid #ff0000;
@@ -247,7 +247,7 @@ class DistressReportDialog(QDialog):
         transmit_btn.clicked.connect(self.accept)
         button_layout.addWidget(transmit_btn)
 
-        cancel_btn = QPushButton("❌ CANCEL DISTRESS")
+        cancel_btn = QPushButton(" CANCEL DISTRESS")
         cancel_btn.setStyleSheet("""
             QPushButton {
                 font-size: 12px; padding: 10px; background-color: #666666;
@@ -273,7 +273,7 @@ class HailVesselDialog(QDialog):
         layout = QVBoxLayout()
         layout.setSpacing(15)
 
-        title = QLabel("📡 COMMUNICATION CHANNEL OPEN 📡")
+        title = QLabel(" COMMUNICATION CHANNEL OPEN ")
         title.setStyleSheet("""
             font-size: 14px; font-weight: bold; color: #64ffda; letter-spacing: 2px;
             padding: 10px; background-color: #112240; border: 1px solid #64ffda;
@@ -291,7 +291,7 @@ VESSEL DETAILS:
         info_label.setStyleSheet("font-size: 10px; color: #8892b0; background-color: #112240; padding: 10px;")
         layout.addWidget(info_label)
 
-        hail_label = QLabel(f"OUTGOING TRANSMISSION:\n📢 {vessel_info['hail_message']}")
+        hail_label = QLabel(f"OUTGOING TRANSMISSION:\n {vessel_info['hail_message']}")
         hail_label.setWordWrap(True)
         hail_label.setStyleSheet("font-size: 11px; color: #8892b0; padding: 5px;")
         layout.addWidget(hail_label)
@@ -303,7 +303,7 @@ VESSEL DETAILS:
         layout.addWidget(response_label)
 
         if vessel_info['is_suspicious']:
-            threat_label = QLabel("⚠️ AI THREAT ASSESSMENT: SUSPICIOUS BEHAVIOR DETECTED")
+            threat_label = QLabel(" AI THREAT ASSESSMENT: SUSPICIOUS BEHAVIOR DETECTED")
             threat_label.setStyleSheet("font-size: 11px; color: #ff4444; font-weight: bold; background-color: #4a0000; padding: 8px;")
             layout.addWidget(threat_label)
 
@@ -334,7 +334,7 @@ class StatusLogWindow(QDialog):
 
         layout = QVBoxLayout()
 
-        title = QLabel("📋 MISSION STATUS LOG 📋")
+        title = QLabel("MISSION STATUS LOG")
         title.setStyleSheet("""
             font-size: 16px; font-weight: bold; color: #64ffda; letter-spacing: 2px;
             padding: 10px; background-color: #112240; border: 1px solid #64ffda;
@@ -390,7 +390,7 @@ class StatusReportWindow(QDialog):
 
         layout = QVBoxLayout()
 
-        title = QLabel("📊 TACTICAL STATUS REPORT 📊")
+        title = QLabel("TACTICAL STATUS REPORT")
         title.setStyleSheet("""
             font-size: 16px; font-weight: bold; color: #64ffda; letter-spacing: 2px;
             padding: 10px; background-color: #112240; border: 1px solid #64ffda;
@@ -446,7 +446,7 @@ class StartMenu(QWidget):
         layout.setSpacing(20)
         layout.setContentsMargins(50, 50, 50, 50)
 
-        title = QLabel("⚓ NAVAL COMBAT SIMULATION ⚓")
+        title = QLabel("NAVAL COMBAT SIMULATION")
         title.setStyleSheet("""
             font-size: 28px; font-weight: bold; color: #64ffda; letter-spacing: 3px;
             padding: 20px; background-color: #112240; border: 2px solid #64ffda;
@@ -649,16 +649,16 @@ class SimulationWindow(QMainWindow):
 
         system_layout = QHBoxLayout()
 
-        self.pause_btn = QPushButton("▶ START")
+        self.pause_btn = QPushButton(" START")
         self.pause_btn.setStyleSheet(self.get_system_button_style())
         system_layout.addWidget(self.pause_btn)
 
-        log_btn = QPushButton("📋 LOG")
+        log_btn = QPushButton(" LOG")
         log_btn.setStyleSheet(self.get_system_button_style())
         log_btn.clicked.connect(self.show_status_log)
         system_layout.addWidget(log_btn)
 
-        report_btn = QPushButton("📊 REPORT")
+        report_btn = QPushButton(" REPORT")
         report_btn.setStyleSheet(self.get_system_button_style())
         report_btn.clicked.connect(self.show_status_report)
         system_layout.addWidget(report_btn)
@@ -691,13 +691,13 @@ class SimulationWindow(QMainWindow):
         self.intercept_btn.clicked.connect(self.intercept_vessel)
         action_layout.addWidget(self.intercept_btn)
 
-        self.mark_safe_btn = QPushButton("✅ MARK SAFE")
+        self.mark_safe_btn = QPushButton("MARK SAFE")
         self.mark_safe_btn.setStyleSheet(button_style)
         self.mark_safe_btn.setEnabled(False)
         self.mark_safe_btn.clicked.connect(self.mark_safe)
         action_layout.addWidget(self.mark_safe_btn)
 
-        self.mark_threat_btn = QPushButton("⚠️ MARK THREAT")
+        self.mark_threat_btn = QPushButton("MARK THREAT")
         self.mark_threat_btn.setStyleSheet(button_style)
         self.mark_threat_btn.setEnabled(False)
         self.mark_threat_btn.clicked.connect(self.mark_as_threat)
@@ -729,7 +729,7 @@ class SimulationWindow(QMainWindow):
         comm_frame = QFrame()
         comm_layout = QVBoxLayout(comm_frame)
 
-        comm_title = QLabel("📡 COMMUNICATION CENTER")
+        comm_title = QLabel("COMMUNICATION CENTER")
         comm_title.setStyleSheet("""
             font-size: 14px; font-weight: bold; color: #64ffda;
             padding: 5px; background-color: #1d3b53; border: 1px solid #64ffda;
@@ -741,7 +741,7 @@ class SimulationWindow(QMainWindow):
         self.comm_status.setStyleSheet("font-size: 10px; color: #8892b0; padding: 5px;")
         comm_layout.addWidget(self.comm_status)
 
-        comm_btn = QPushButton("📞 OPEN COMMUNICATION WINDOW")
+        comm_btn = QPushButton("OPEN COMMUNICATION WINDOW")
         comm_btn.setStyleSheet("""
             QPushButton {
                 font-size: 12px; padding: 10px; background-color: #64ffda;
@@ -758,7 +758,7 @@ class SimulationWindow(QMainWindow):
         distress_frame = QFrame()
         distress_layout = QVBoxLayout(distress_frame)
 
-        distress_title = QLabel("🚨 EMERGENCY RESPONSE")
+        distress_title = QLabel("EMERGENCY RESPONSE")
         distress_title.setStyleSheet("""
             font-size: 14px; font-weight: bold; color: #ff4444;
             padding: 5px; background-color: #4a0000; border: 1px solid #ff0000;
@@ -770,7 +770,7 @@ class SimulationWindow(QMainWindow):
         self.distress_status.setStyleSheet("font-size: 10px; color: #ff8888; padding: 5px;")
         distress_layout.addWidget(self.distress_status)
 
-        self.distress_btn = QPushButton("📡 INITIATE DISTRESS CALL")
+        self.distress_btn = QPushButton("INITIATE DISTRESS CALL")
         self.distress_btn.setStyleSheet("""
             QPushButton {
                 font-size: 12px; padding: 10px; background-color: #ff4444;
@@ -888,7 +888,7 @@ CREW: {unit.crew_count}
         def handle_send():
             msg = input_box.toPlainText().strip()
             if not msg:
-                response_label.setText("⚠️ Please type a message first.")
+                response_label.setText("WARNING: Please type a message first.")
                 return
             reply = self.controller.respond_to_communication(unit.id, msg)
             response_label.setText(f"📡 Response: {reply}")
@@ -960,7 +960,7 @@ CREW: {unit.crew_count}
             
             if true_threat_level == "hostile":
                 self.distress_btn.setEnabled(True)
-                self.distress_status.setText("⚠️ Hostile vessel detected - Distress available")
+                self.distress_status.setText("WARNING: Hostile vessel detected - Distress available")
                 self.details_label.setText(f"Vessel correctly identified as {true_threat_level}")
             else:
                 self.details_label.setText(f"Warning: Vessel was actually {true_threat_level}")
@@ -976,7 +976,8 @@ CREW: {unit.crew_count}
         target = self.controller.selected_unit
         distance = self.controller.get_distance(self.controller.player_ship, target)
         
-        if distance > 100:  # 100 units as interception range
+        if distance > self.controller.get_intercept_range():
+             # 100 units as interception range
             self.status_label.setText("Target out of interception range. Move closer.")
             return
             
@@ -1012,7 +1013,7 @@ CREW: {unit.crew_count}
             
             if confidence > 0.8 and threat_assessment == "THREAT":
                 self.distress_btn.setEnabled(True)
-                self.distress_status.setText("⚠️ High threat detected - Distress available")
+                self.distress_status.setText("WARNING: High threat detected - Distress available")
         else:
             self.status_label.setText(f"Interception failed: {result['message']}")
 
@@ -1030,12 +1031,29 @@ CREW: {unit.crew_count}
         for item in items_to_remove:
             self.scene.removeItem(item)
 
+        # Draw only the current active patrol zone — hide the smaller box after expansion
+       # --- FIXED: Draw and update only the active patrol zone dynamically ---
         zone = self.controller.get_zone_info()
-        zone_item = QGraphicsRectItem(zone["x"], zone["y"], zone["width"], zone["height"])
-        zone_border = QColor(255, 70, 70, 255)
-        zone_item.setBrush(QBrush(Qt.BrushStyle.NoBrush))
-        zone_item.setPen(QPen(zone_border, 3, Qt.PenStyle.DashLine))
-        self.scene.addItem(zone_item)
+
+# If we already have a zone item, update its geometry instead of redrawing
+        if hasattr(self, "zone_item") and self.zone_item and self.zone_item.scene():
+            self.zone_item.setRect(zone["x"], zone["y"], zone["width"], zone["height"])
+        else:
+            self.zone_item = QGraphicsRectItem(zone["x"], zone["y"], zone["width"], zone["height"])
+            zone_border = QColor(255, 70, 70, 255)
+            self.zone_item.setBrush(QBrush(Qt.BrushStyle.NoBrush))
+            self.zone_item.setPen(QPen(zone_border, 3, Qt.PenStyle.DashLine))
+            self.scene.addItem(self.zone_item)
+
+# Remove inner zone if expansion occurred
+        if self.controller.zone_expanded:
+            if hasattr(self, "inner_zone_item") and self.inner_zone_item and self.inner_zone_item.scene():
+                self.scene.removeItem(self.inner_zone_item)
+            self.inner_zone_item = None
+        else:
+            self.inner_zone_item = self.zone_item
+
+        
 
         vessels = self.controller.get_vessel_positions()
         
