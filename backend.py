@@ -238,6 +238,11 @@ class SimulationController:
     INTERCEPT_RANGE = 150
 
     def __init__(self, mission_type: str = "Patrol Boat", difficulty: str = "novice", player_data: Dict = None):
+        import database
+        database.setup_database()  # Initialize DB
+        self.db = database
+
+        
         self.mission_type = mission_type
         self.difficulty = difficulty
         self.player_data = player_data or {}

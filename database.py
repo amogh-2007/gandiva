@@ -2,6 +2,36 @@
 import sqlite3
 import json
 import time
+from backend import Vessel  # ✅ ADD THIS IMPORT
+
+def save_boat(boat: Vessel):  # ✅ Add type hint
+    """Insert or update a boat in the database."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    # ✅ FIXED: Use correct Vessel class attributes
+    data = (
+        boat.vessel_type,           # ✅ Use vessel_type instead of name
+        boat.vessel_type,           # ✅ Use vessel_type for type field
+        boat.x,                     # ✅ Use x instead of position[0]
+        boat.y,                     # ✅ Use y instead of position[1]
+        boat.vx,                    # ✅ Use vx instead of velocity[0]
+        boat.vy,                    # ✅ Use vy instead of velocity[1]
+        boat.threat_level,
+        boat.crew_count,
+        json.dumps(boat.items),     # ✅ Use items instead of cargo
+        json.dumps(boat.weapons),
+        time.time()
+    )
+
+    cursor.execute("""
+        INSERT INTO boats (name, type, position_x, position_y, velocity_x, velocity_y, 
+                           threat_level, crew_count, cargo, weapons, last_update)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, data)
+
+    conn.commit()
+    conn.close()
 
 DB_NAME = "coastal_defender.db"
 
@@ -89,6 +119,10 @@ def save_boat(boat):
     conn.commit()
     conn.close()
 
+def add_vessel(self, x, y, vessel_type, etc):
+    vessel = Vessel(...)
+    self.db.save_boat(vessel.to_dict())  # Save to DB
+    return vessel
 
 def load_boats():
     """Load all boats into the backend."""

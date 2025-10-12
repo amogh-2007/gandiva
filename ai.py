@@ -21,24 +21,17 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 # Mock database module (returns dicts for consistency)
-class MockDatabase:
+class AIDatabase:
     def get_boat(self, vessel_id):
-        mock_data = {
-            "x": random.uniform(100, 700), "y": random.uniform(100, 500),
-            "speed": random.uniform(0, 10), "heading": random.uniform(0, 360),
-            "vessel_type": random.choice(["Trawler", "Cargo Ship"]),
-            "behavior": "idle", "true_threat_level": random.choice(["neutral", "possible", "confirmed"]),
-            "evasion_chance": random.uniform(0.1, 0.8), "detection_range": 200, "aggressiveness": 0.1,
-            "id": f"vessel_{random.randint(1000, 9999)}"
-        }
-        return mock_data
+        # Query real database instead of mock data
+        return database.get_vessel_data(vessel_id)
     
     def get_sim_state(self, player_id):
         return {"x": 400, "y": 300, "speed": 15, "heading": 0, "vessel_type": "Player Ship",
                 "behavior": "command", "true_threat_level": "neutral", "evasion_chance": 0.0,
                 "detection_range": 500, "aggressiveness": 0.0, "id": "player_1"}
 
-database = MockDatabase()
+database = AIDatabase()
 
 # --- Enhanced Deep Learning Framework ---
 class DQNetwork:
