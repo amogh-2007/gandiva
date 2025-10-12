@@ -247,6 +247,8 @@ class SimulationController:
         self.selected_unit: Optional[Vessel] = None
         self.game_over: bool = False
         self.paused: bool = False
+        # Communication log for performance analysis
+        self.communication_log = []  # list of dicts: {vessel_id, player_msg, vessel_reply, threat_level, timestamp}
 
         # track whether player is inside the original small patrol box
         self.in_patrol_zone: bool = False
@@ -554,6 +556,53 @@ class SimulationController:
             
             v.vx, v.vy = float(new_vel[0]), float(new_vel[1])
             v.update_position(dt=dt, bounds=(self.fleet.region_w, self.fleet.region_h))
+    
+
+    def respond_to_communication(self, vessel_id: int, player_message: str) -> str:
+        """
+        Generate a vessel's response to a player's message based on its scenario context.
+        Logs the communication for performance evaluation.
+        """
+        vessel = self.fleet.vessels.get(vessel_id)
+        if not vessel:
+            return "No response — vessel not found."
+
+        threat = vessel.true_threat_level
+
+        # Basic AI response logic
+        if threat == "confirmed":
+            # Aggressive or evasive responses
+            possible_replies = [
+                "Vessel refuses to comply and issues a hostile response!",
+                "The vessel ignores your hails and changes course.",
+                "They broadcast threats over the radio."
+            ]
+            reply = random.choice(possible_replies)
+        elif threat == "possible":
+            possible_replies = [
+                "The vessel gives vague answers, avoiding your questions.",
+                "They identify themselves, but their story seems inconsistent.",
+                "They claim to be on a routine trip but avoid giving details."
+            ]
+            reply = random.choice(possible_replies)
+        else:
+            possible_replies = [
+                "The vessel identifies itself and complies with communication.",
+                "They respond politely and provide their credentials.",
+                "They acknowledge your hail and offer to cooperate."
+            ]
+            reply = random.choice(possible_replies)
+
+        # Log the interaction for later performance analysis
+        self.communication_log.append({
+            "timestamp": time.time(),
+            "vessel_id": vessel_id,
+            "player_msg": player_message,
+            "vessel_reply": reply,
+            "threat_level": threat
+        })
+
+        return reply
 
     def _update_threat_states(self):
         for v in self.units:

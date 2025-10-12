@@ -719,6 +719,53 @@ class SimulationWindow(QMainWindow):
         layout.addWidget(distress_section)
 
         return bottom_frame
+    
+    def show_communication_dialog(self, unit):
+        """Open a communication channel popup with the selected vessel."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"Communicate with {unit.vessel_type} (ID {unit.id})")
+        dialog.setModal(True)
+        dialog.resize(400, 300)
+
+        layout = QVBoxLayout(dialog)
+
+        # Info label
+        info_label = QLabel(f"You have opened a channel with {unit.vessel_type}.\n"
+                        "Type a message or warning below:")
+        layout.addWidget(info_label)
+
+        # Text input area
+        input_box = QTextEdit()
+        input_box.setPlaceholderText("e.g. Identify yourself, state your intentions...")
+        layout.addWidget(input_box)
+
+        # Response area
+        response_label = QLabel("Response will appear here.")
+        layout.addWidget(response_label)
+
+        # Buttons
+        button_row = QHBoxLayout()
+        send_button = QPushButton("Send")
+        close_button = QPushButton("Close Channel")
+        button_row.addWidget(send_button)
+        button_row.addWidget(close_button)
+        layout.addLayout(button_row)
+
+        # Handle send
+        def handle_send():
+            msg = input_box.toPlainText().strip()
+            if not msg:
+                response_label.setText("⚠️ Please type a message first.")
+                return
+
+            # ✅ Backend handles the AI response
+            reply = self.controller.respond_to_communication(unit.id, msg)
+            response_label.setText(f"📡 Response: {reply}")
+
+        send_button.clicked.connect(handle_send)
+        close_button.clicked.connect(dialog.accept)
+
+        dialog.exec()
 
     def setup_communication_section(self):
         comm_frame = QFrame()
@@ -962,6 +1009,7 @@ class SimulationWindow(QMainWindow):
                    f"Distance: {distance:.0f} m\n\n"
                    f"Click INTERCEPT to hail / communicate.")
             self.details_label.setText(details)
+            self.show_communication_dialog(unit)
         else:
             self.details_label.setText("No vessel selected")
             self.intercept_btn.setEnabled(False)
