@@ -78,6 +78,9 @@ class EnhancedAITrainingPipeline:
     """Optimized training pipeline with improved threat handling"""
     
     def __init__(self, episodes=100, steps_per_episode=50, enable_debug=False):
+        import database
+        self.database = database
+        self.session_id = f"training_{int(time.time())}"
         self.episodes = episodes
         self.steps_per_episode = steps_per_episode
         self.enable_debug = enable_debug

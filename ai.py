@@ -20,16 +20,37 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Mock database module (returns dicts for consistency)
+
+import database
+
 class AIDatabase:
     def get_boat(self, vessel_id):
-        # Query real database instead of mock data
-        return database.get_vessel_data(vessel_id)
+        vessel_data = database.get_vessel(vessel_id)
+        if vessel_data:
+            return vessel_data
+        else:
+            # Fallback with proper structure
+            return {
+                "x": 400, "y": 300, "speed": 5.0, "heading": 0,
+                "vessel_type": "Unknown", "behavior": "idle", 
+                "true_threat_level": "neutral", "evasion_chance": 0.1,
+                "detection_range": 200, "aggressiveness": 0.1,
+                "id": f"vessel_{vessel_id}"
+            }
     
     def get_sim_state(self, player_id):
-        return {"x": 400, "y": 300, "speed": 15, "heading": 0, "vessel_type": "Player Ship",
-                "behavior": "command", "true_threat_level": "neutral", "evasion_chance": 0.0,
-                "detection_range": 500, "aggressiveness": 0.0, "id": "player_1"}
+        # Get player vessel from database or return default
+        player_vessels = [v for v in database.load_vessels() if v.get('vessel_type') == 'Player Vessel']
+        if player_vessels:
+            return player_vessels[0]
+        else:
+            return {
+                "x": 400, "y": 300, "speed": 15, "heading": 0, 
+                "vessel_type": "Player Ship", "behavior": "command",
+                "true_threat_level": "neutral", "evasion_chance": 0.0,
+                "detection_range": 500, "aggressiveness": 0.0, 
+                "id": "player_1"
+            }
 
 database = AIDatabase()
 

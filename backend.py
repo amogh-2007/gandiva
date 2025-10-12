@@ -239,10 +239,12 @@ class SimulationController:
 
     def __init__(self, mission_type: str = "Patrol Boat", difficulty: str = "novice", player_data: Dict = None):
         import database
-        database.setup_database()  # Initialize DB
-        self.db = database
+        self.database = database
+    
+        # Load existing vessels from database
+        self.load_vessels_from_database()
 
-        
+
         self.mission_type = mission_type
         self.difficulty = difficulty
         self.player_data = player_data or {}
@@ -296,6 +298,30 @@ class SimulationController:
         self.enemy_max_speed = 1.8
         self.zone_expand_padding = (200.0, 150.0)
         self.threat_upgrade_prob_per_tick = 0.002
+
+    def load_vessels_from_database(self):
+        """Load vessels from database on startup."""
+        saved_vessels = self.database.load_vessels()
+        for vessel_data in saved_vessels:
+            if vessel_data['vessel_type'] != 'Player Vessel':
+                vessel = self.fleet.add_vessel(
+                    x=vessel_data['x'], y=vessel_data['y'],
+                    vx=vessel_data['vx'], vy=vessel_data['vy'],
+                    vessel_type=vessel_data['vessel_type'],
+                    true_threat_level=vessel_data['true_threat_level'],
+                    crew_count=vessel_data['crew_count']
+                )
+                # Update vessel with saved data
+                vessel.scanned = vessel_data['scanned']
+                vessel.threat_level = vessel_data['threat_level']
+                if vessel not in self.units:
+                    self.units.append(vessel)
+
+    def save_vessels_to_database(self):
+        """Save current vessels to database."""
+        for vessel in self.units:
+            vessel_data = vessel.to_dict()
+            self.database.save_vessel(vessel_data)
 
     def on(self, event_name: str, cb: Callable[..., None]):
         if event_name not in self._listeners:
