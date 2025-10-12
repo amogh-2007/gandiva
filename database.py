@@ -131,40 +131,55 @@ def save_vessel(vessel_data: Dict[str, Any]) -> int:
     items_json = json.dumps(vessel_data.get('items', []))
     weapons_json = json.dumps(vessel_data.get('weapons', []))
     
+    # Ensure numeric types are properly converted
     data = (
         vessel_data.get('vessel_type', 'Unknown'),
-        vessel_data.get('x', 400.0),
-        vessel_data.get('y', 300.0),
-        vessel_data.get('vx', 0.0),
-        vessel_data.get('vy', 0.0),
-        vessel_data.get('speed', 0.0),
-        vessel_data.get('heading', 0.0),
+        float(vessel_data.get('x', 400.0)),  # Ensure float
+        float(vessel_data.get('y', 300.0)),  # Ensure float
+        float(vessel_data.get('vx', 0.0)),   # Ensure float
+        float(vessel_data.get('vy', 0.0)),   # Ensure float
+        float(vessel_data.get('speed', 0.0)), # Ensure float
+        float(vessel_data.get('heading', 0.0)), # Ensure float
         vessel_data.get('threat_level', 'unknown'),
         vessel_data.get('true_threat_level', 'neutral'),
         1 if vessel_data.get('scanned', False) else 0,
         1 if vessel_data.get('active', True) else 0,
-        vessel_data.get('distance_from_patrol', 9999.0),
-        vessel_data.get('crew_count', 0),
+        float(vessel_data.get('distance_from_patrol', 9999.0)), # Ensure float
+        int(vessel_data.get('crew_count', 0)),  # Ensure int
         items_json,
         weapons_json,
-        vessel_data.get('detection_range', 200),
-        vessel_data.get('aggressiveness', 0.1),
-        vessel_data.get('evasion_chance', 0.1),
+        int(vessel_data.get('detection_range', 200)),  # Ensure int
+        float(vessel_data.get('aggressiveness', 0.1)), # Ensure float
+        float(vessel_data.get('evasion_chance', 0.1)), # Ensure float
         vessel_data.get('behavior', 'idle'),
         time.time()
     )
 
     if 'id' in vessel_data and vessel_data['id']:
-        # Update existing vessel
-        cursor.execute("""
-            UPDATE vessels SET 
-            vessel_type=?, x=?, y=?, vx=?, vy=?, speed=?, heading=?,
-            threat_level=?, true_threat_level=?, scanned=?, active=?,
-            distance_from_patrol=?, crew_count=?, items=?, weapons=?,
-            detection_range=?, aggressiveness=?, evasion_chance=?, behavior=?, last_update=?
-            WHERE id=?
-        """, data + (vessel_data['id'],))
-        vessel_id = vessel_data['id']
+        # Update existing vessel - ensure ID is int
+        try:
+            vessel_id = int(vessel_data['id'])
+        except (ValueError, TypeError):
+            # If ID can't be converted to int, treat as new vessel
+            cursor.execute("""
+                INSERT INTO vessels (
+                    vessel_type, x, y, vx, vy, speed, heading, threat_level,
+                    true_threat_level, scanned, active, distance_from_patrol,
+                    crew_count, items, weapons, detection_range, aggressiveness,
+                    evasion_chance, behavior, last_update
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, data)
+            vessel_id = cursor.lastrowid
+        else:
+            # Valid integer ID, update existing
+            cursor.execute("""
+                UPDATE vessels SET 
+                vessel_type=?, x=?, y=?, vx=?, vy=?, speed=?, heading=?,
+                threat_level=?, true_threat_level=?, scanned=?, active=?,
+                distance_from_patrol=?, crew_count=?, items=?, weapons=?,
+                detection_range=?, aggressiveness=?, evasion_chance=?, behavior=?, last_update=?
+                WHERE id=?
+            """, data + (vessel_id,))
     else:
         # Insert new vessel
         cursor.execute("""
@@ -181,8 +196,9 @@ def save_vessel(vessel_data: Dict[str, Any]) -> int:
     conn.close()
     return vessel_id
 
+
 def load_vessels() -> List[Dict[str, Any]]:
-    """Load all vessels from database."""
+    """Load all vessels from database with proper type conversion."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM vessels WHERE active = 1")
@@ -191,30 +207,34 @@ def load_vessels() -> List[Dict[str, Any]]:
     
     vessels = []
     for row in rows:
-        vessel = {
-            'id': row[0],
-            'vessel_type': row[1],
-            'x': row[2],
-            'y': row[3],
-            'vx': row[4],
-            'vy': row[5],
-            'speed': row[6],
-            'heading': row[7],
-            'threat_level': row[8],
-            'true_threat_level': row[9],
-            'scanned': bool(row[10]),
-            'active': bool(row[11]),
-            'distance_from_patrol': row[12],
-            'crew_count': row[13],
-            'items': json.loads(row[14]),
-            'weapons': json.loads(row[15]),
-            'detection_range': row[16],
-            'aggressiveness': row[17],
-            'evasion_chance': row[18],
-            'behavior': row[19],
-            'last_update': row[20]
-        }
-        vessels.append(vessel)
+        try:
+            vessel = {
+                'id': int(row[0]) if row[0] is not None else 0,
+                'vessel_type': str(row[1]) if row[1] is not None else 'Unknown',
+                'x': float(row[2]) if row[2] is not None else 400.0,
+                'y': float(row[3]) if row[3] is not None else 300.0,
+                'vx': float(row[4]) if row[4] is not None else 0.0,
+                'vy': float(row[5]) if row[5] is not None else 0.0,
+                'speed': float(row[6]) if row[6] is not None else 0.0,
+                'heading': float(row[7]) if row[7] is not None else 0.0,
+                'threat_level': str(row[8]) if row[8] is not None else 'unknown',
+                'true_threat_level': str(row[9]) if row[9] is not None else 'neutral',
+                'scanned': bool(row[10]) if row[10] is not None else False,
+                'active': bool(row[11]) if row[11] is not None else True,
+                'distance_from_patrol': float(row[12]) if row[12] is not None else 9999.0,
+                'crew_count': int(row[13]) if row[13] is not None else 0,
+                'items': json.loads(row[14]) if row[14] else [],
+                'weapons': json.loads(row[15]) if row[15] else [],
+                'detection_range': int(row[16]) if row[16] is not None else 200,
+                'aggressiveness': float(row[17]) if row[17] is not None else 0.1,
+                'evasion_chance': float(row[18]) if row[18] is not None else 0.1,
+                'behavior': str(row[19]) if row[19] is not None else 'idle',
+                'last_update': float(row[20]) if row[20] is not None else time.time()
+            }
+            vessels.append(vessel)
+        except Exception as e:
+            print(f"Warning: Error loading vessel data: {e}")
+            continue
     
     return vessels
 
