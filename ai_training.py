@@ -1,7 +1,7 @@
-# ai_training.py
+# ai_training.py - UPDATED WITH ROBUST ERROR HANDLING
 """
 Enhanced AI Training Pipeline for Naval Combat Simulation
-Integrated with all fixes, improved reward system, and comprehensive debugging
+Fixed error handling and improved performance reporting
 """
 
 import time
@@ -16,29 +16,26 @@ logger = logging.getLogger(__name__)
 
 class FixedRewardCalculator:
     """
-    Fixed reward calculation with better handling of edge cases
+    FIXED: Balanced reward calculation to address missed threats
     """
     
     @staticmethod
     def calculate_reward(ai_report: AIReport, vessel, action_taken: str) -> float:
         """
-        Robust reward calculation with detailed cases
+        FIXED: More balanced rewards to prevent missed threats
         """
         try:
-            # Get threat level from vessel object
             if hasattr(vessel, 'true_threat_level'):
                 true_threat = vessel.true_threat_level
             else:
-                # Fallback for dictionary-style vessels
                 true_threat = vessel.get('true_threat_level', 'neutral')
             
             recommended_action = ai_report.recommended_action
             confidence = ai_report.confidence
             
-            # Default reward
             reward = 0.0
             
-            # Handle different threat levels and actions
+            # FIXED: More aggressive rewards for threat detection
             if true_threat == "confirmed":
                 reward = FixedRewardCalculator._confirmed_threat_reward(recommended_action, confidence)
             elif true_threat == "possible":
@@ -46,10 +43,10 @@ class FixedRewardCalculator:
             else:  # neutral
                 reward = FixedRewardCalculator._neutral_threat_reward(recommended_action, confidence)
             
-            # Confidence adjustments
+            # FIXED: Stronger confidence adjustments
             reward = FixedRewardCalculator._apply_confidence_adjustments(reward, confidence)
             
-            logger.debug(f"Reward calculation: {true_threat} + {recommended_action.value} + {confidence:.2f} = {reward:.2f}")
+            logger.debug(f"Reward: {true_threat} + {recommended_action.value} + {confidence:.2f} = {reward:.2f}")
             return reward
             
         except Exception as e:
@@ -58,65 +55,65 @@ class FixedRewardCalculator:
     
     @staticmethod
     def _confirmed_threat_reward(action: AIAction, confidence: float) -> float:
-        """Reward for confirmed threats"""
+        """FIXED: Stronger incentives for intercepting confirmed threats"""
         if action == AIAction.INTERCEPT:
-            return 20.0 + (confidence * 8.0)  # High reward for intercepting real threats
+            return 25.0 + (confidence * 10.0)  # Increased reward
         elif action == AIAction.MONITOR:
-            return 3.0  # Small reward for monitoring
+            return -10.0  # Penalty for only monitoring confirmed threats
         elif action == AIAction.IGNORE:
-            return -25.0  # Heavy penalty for ignoring
+            return -35.0  # Heavy penalty for ignoring
         elif action == AIAction.AWAIT_CONFIRMATION:
-            return -3.0  # Small penalty for HITL on clear threats
+            return -5.0   # Small penalty for HITL on clear threats
         elif action == AIAction.EVADE:
-            return 5.0  # Moderate reward for evasion
+            return 8.0    # Good reward for evasion
         else:
-            return -5.0  # Default penalty for unknown actions
+            return -8.0
     
     @staticmethod
     def _possible_threat_reward(action: AIAction, confidence: float) -> float:
-        """Reward for possible threats"""
+        """FIXED: Better rewards for handling possible threats"""
         if action == AIAction.MONITOR:
-            return 12.0 + (confidence * 4.0)  # Good reward for monitoring
+            return 15.0 + (confidence * 6.0)  # Increased reward
         elif action == AIAction.INTERCEPT:
-            return -3.0  # Small penalty for aggressive interception
+            return 8.0   # Reward for proactive interception
         elif action == AIAction.IGNORE:
-            return -8.0  # Penalty for ignoring
+            return -15.0  # Increased penalty
         elif action == AIAction.AWAIT_CONFIRMATION:
-            return 5.0  # Reward for cautious approach
+            return 8.0    # Good reward for cautious approach
         elif action == AIAction.EVADE:
-            return 8.0  # Good reward for evasion
+            return 10.0   # Good reward for evasion
         else:
-            return -2.0  # Small penalty for unknown actions
+            return -3.0
     
     @staticmethod
     def _neutral_threat_reward(action: AIAction, confidence: float) -> float:
-        """Reward for neutral threats"""
+        """FIXED: Adjusted neutral rewards"""
         if action == AIAction.IGNORE:
-            return 8.0 + (confidence * 3.0)  # Reward for correct ignore
+            return 6.0 + (confidence * 2.0)  # Reduced reward
         elif action == AIAction.MONITOR:
-            return 2.0  # Small reward for monitoring
+            return 1.0   # Small reward for monitoring
         elif action == AIAction.INTERCEPT:
-            return -15.0  # Penalty for intercepting neutrals
+            return -20.0 # Heavy penalty for intercepting neutrals
         elif action == AIAction.AWAIT_CONFIRMATION:
-            return -2.0  # Small penalty for HITL
+            return -3.0  # Penalty for unnecessary HITL
         elif action == AIAction.EVADE:
-            return -5.0  # Penalty for unnecessary evasion
+            return -8.0  # Penalty for unnecessary evasion
         else:
-            return -1.0  # Small penalty for unknown actions
+            return -2.0
     
     @staticmethod
     def _apply_confidence_adjustments(reward: float, confidence: float) -> float:
-        """Apply confidence-based adjustments"""
+        """FIXED: Stronger confidence-based adjustments"""
         if confidence > 0.8:
-            return reward + 3.0  # Bonus for high confidence
+            return reward + 5.0  # Bonus for high confidence
         elif confidence < 0.3:
-            return reward - 2.0  # Penalty for low confidence
+            return reward - 4.0  # Penalty for low confidence
         else:
             return reward
 
 class EnhancedAITrainingPipeline:
     """
-    Comprehensive AI Training Pipeline with all improvements integrated
+    FIXED: Training pipeline with improved threat handling and error resilience
     """
     
     def __init__(self, episodes=100, steps_per_episode=50, enable_debug=False):
@@ -124,10 +121,19 @@ class EnhancedAITrainingPipeline:
         self.steps_per_episode = steps_per_episode
         self.enable_debug = enable_debug
         self.simulation = SimulationController(mission_type="Training", difficulty="medium")
+        
+        # FIXED: Initialize AI with better parameters
         self.ai = NavalAI(backend=None)
+        # Adjust AI parameters for better threat detection
+        self.ai.hitl_confidence_threshold = 0.6  # Lower threshold for more autonomy
+        self.ai.epsilon_decay = 0.995  # Slower exploration decay
+        
+        # FIXED: Ensure AI has required attributes
+        self._ensure_ai_attributes()
+        
         self.reward_calculator = FixedRewardCalculator()
         
-        # Comprehensive training metrics
+        # Enhanced training metrics
         self.training_metrics = {
             'episode_rewards': [],
             'episode_threat_accuracy': [],
@@ -138,13 +144,32 @@ class EnhancedAITrainingPipeline:
             'correct_ignores': 0,
             'hitl_requests': 0,
             'training_losses': [],
-            'confidence_stats': {'high': 0, 'medium': 0, 'low': 0}
+            'confidence_stats': {'high': 0, 'medium': 0, 'low': 0},
+            'threat_type_breakdown': {'confirmed': 0, 'possible': 0, 'neutral': 0}
         }
         
         if self.enable_debug:
             logger.setLevel(logging.DEBUG)
             print("🔧 Debug mode enabled")
-    
+
+    def _ensure_ai_attributes(self):
+        """Ensure AI has all required attributes to prevent errors"""
+        required_attrs = {
+            'train_counter': 0,
+            'performance_metrics': {
+                "decisions": 0, 
+                "hitl_requests": 0, 
+                "cumulative_reward": 0.0, 
+                "vessels_generated": 0,
+                "training_losses": []
+            }
+        }
+        
+        for attr, default_value in required_attrs.items():
+            if not hasattr(self.ai, attr):
+                setattr(self.ai, attr, default_value)
+                logger.info(f"Set missing attribute {attr} on AI instance")
+
     def run_comprehensive_test(self):
         """Run comprehensive system test before training"""
         print("\n🔍 COMPREHENSIVE SYSTEM TEST")
@@ -193,7 +218,7 @@ class EnhancedAITrainingPipeline:
         else:
             print("⚠️  Some tests failed. Check the issues above.")
             return False
-    
+
     def test_ai_initialization(self):
         """Test AI initialization and basic functionality"""
         try:
@@ -214,7 +239,7 @@ class EnhancedAITrainingPipeline:
         except Exception as e:
             print(f"   Error: {e}")
             return False
-    
+
     def test_scenario_generation(self):
         """Test scenario generation and vessel conversion"""
         try:
@@ -240,48 +265,49 @@ class EnhancedAITrainingPipeline:
         except Exception as e:
             print(f"   Error: {e}")
             return False
-    
-    def test_reward_calculation(self):
-        """Test reward calculation with various scenarios"""
-        try:
-            test_cases = [
-                # (threat_level, action, expected_min, description)
-                ("confirmed", AIAction.INTERCEPT, 15, "Intercept confirmed threat"),
-                ("confirmed", AIAction.IGNORE, -25, "Ignore confirmed threat"),
-                ("possible", AIAction.MONITOR, 8, "Monitor possible threat"),
-                ("neutral", AIAction.IGNORE, 5, "Ignore neutral vessel"),
-            ]
+# In the test_reward_calculation method, update the test cases:
+
+def test_reward_calculation(self):
+    """Test reward calculation with various scenarios"""
+    try:
+        test_cases = [
+            # (threat_level, action, expected_min, description)
+            ("confirmed", AIAction.INTERCEPT, 15, "Intercept confirmed threat"),
+            ("confirmed", AIAction.IGNORE, -35, "Ignore confirmed threat"),  # CHANGED: -25 to -35
+            ("possible", AIAction.MONITOR, 8, "Monitor possible threat"),
+            ("neutral", AIAction.IGNORE, 5, "Ignore neutral vessel"),
+        ]
+        
+        for threat_level, action, expected_min, description in test_cases:
+            # Create test vessel and report
+            vessel_data = self._create_test_vessel("Test", threat_level, 300, 300)
+            report = AIReport(
+                vessel_id="test",
+                threat_assessment=threat_level,
+                recommended_action=action,
+                confidence=0.7,
+                reasoning="Test",
+                timestamp=time.time()
+            )
             
-            for threat_level, action, expected_min, description in test_cases:
-                # Create test vessel and report
-                vessel_data = self._create_test_vessel("Test", threat_level, 300, 300)
-                report = AIReport(
-                    vessel_id="test",
-                    threat_assessment=threat_level,
-                    recommended_action=action,
-                    confidence=0.7,
-                    reasoning="Test",
-                    timestamp=time.time()
-                )
-                
-                class MockVessel:
-                    def __init__(self, data):
-                        self.true_threat_level = data['true_threat_level']
-                
-                mock_vessel = MockVessel(vessel_data)
-                reward = self.reward_calculator.calculate_reward(report, mock_vessel, "test")
-                
-                if reward >= expected_min:
-                    print(f"   ✅ {description}: {reward:.2f}")
-                else:
-                    print(f"   ❌ {description}: {reward:.2f} (expected >= {expected_min})")
-                    return False
+            class MockVessel:
+                def __init__(self, data):
+                    self.true_threat_level = data['true_threat_level']
             
-            return True
-        except Exception as e:
-            print(f"   Error: {e}")
-            return False
-    
+            mock_vessel = MockVessel(vessel_data)
+            reward = self.reward_calculator.calculate_reward(report, mock_vessel, "test")
+            
+            if reward >= expected_min:
+                print(f"   ✅ {description}: {reward:.2f}")
+            else:
+                print(f"   ❌ {description}: {reward:.2f} (expected >= {expected_min})")
+                return False
+        
+        return True
+    except Exception as e:
+        print(f"   Error: {e}")
+        return False
+
     def test_training_integration(self):
         """Test complete training integration"""
         try:
@@ -343,7 +369,7 @@ class EnhancedAITrainingPipeline:
         except Exception as e:
             print(f"   Error: {e}")
             return False
-    
+
     def _create_test_vessel(self, vessel_type: str, threat_level: str, x: float, y: float) -> dict:
         """Create a test vessel with specified parameters"""
         return {
@@ -355,7 +381,7 @@ class EnhancedAITrainingPipeline:
             'detection_range': 200,
             'aggressiveness': 0.8 if threat_level == 'confirmed' else 0.2
         }
-    
+
     def _create_test_player(self) -> dict:
         """Create test player data"""
         return {
@@ -364,7 +390,7 @@ class EnhancedAITrainingPipeline:
             'true_threat_level': 'neutral', 'evasion_chance': 0.0,
             'detection_range': 500, 'aggressiveness': 0.0
         }
-    
+
     def _convert_vessel_to_ai_format(self, vessel_data: dict) -> dict:
         """Convert vessel data to AI-compatible format"""
         try:
@@ -384,7 +410,7 @@ class EnhancedAITrainingPipeline:
         except Exception as e:
             logger.warning(f"Error converting vessel: {e}")
             return self._create_test_vessel("Unknown", "neutral", 400, 300)
-    
+
     def _convert_player_to_ai_format(self) -> dict:
         """Convert player vessel to AI format"""
         player = self.simulation.player_ship
@@ -400,7 +426,7 @@ class EnhancedAITrainingPipeline:
             'detection_range': 500,
             'aggressiveness': 0.0
         }
-    
+
     def add_vessels_from_ai_scenario(self, ai_scenario):
         """Add vessels from AI scenario with better distribution"""
         vessels_added = 0
@@ -425,7 +451,7 @@ class EnhancedAITrainingPipeline:
         
         logger.info(f"Added {vessels_added} vessels to simulation")
         return vessels_added
-    
+
     def _update_confidence_stats(self, confidence: float):
         """Update confidence statistics"""
         if confidence > 0.7:
@@ -434,12 +460,22 @@ class EnhancedAITrainingPipeline:
             self.training_metrics['confidence_stats']['medium'] += 1
         else:
             self.training_metrics['confidence_stats']['low'] += 1
-    
+
+    def _analyze_threat_distribution(self, vessels):
+        """Analyze threat distribution in current scenario"""
+        for vessel in vessels:
+            if hasattr(vessel, 'true_threat_level'):
+                threat_level = vessel.true_threat_level
+                self.training_metrics['threat_type_breakdown'][threat_level] += 1
+
     def execute_ai_decision(self, ai_report: AIReport, vessel: Vessel):
-        """Execute AI decision and track outcomes"""
+        """FIXED: Better decision execution with threat analysis"""
         try:
             action = ai_report.recommended_action
             true_threat = vessel.true_threat_level
+            
+            # Track threat distribution
+            self.training_metrics['threat_type_breakdown'][true_threat] += 1
             
             if action == AIAction.INTERCEPT:
                 if true_threat in ["possible", "confirmed"]:
@@ -454,6 +490,9 @@ class EnhancedAITrainingPipeline:
                 if true_threat == "possible":
                     self.training_metrics['correct_monitors'] += 1
                     return "correct_monitor"
+                elif true_threat == "confirmed":
+                    self.training_metrics['missed_threats'] += 1  # FIXED: Monitor on confirmed threat is a miss
+                    return "missed_threat"
                 else:
                     return "monitoring"
                     
@@ -469,7 +508,6 @@ class EnhancedAITrainingPipeline:
                     
             elif action == AIAction.AWAIT_CONFIRMATION:
                 self.training_metrics['hitl_requests'] += 1
-                # Simulate human decision
                 if true_threat in ["possible", "confirmed"]:
                     vessel.active = False
                     return "human_confirmed_threat"
@@ -480,7 +518,7 @@ class EnhancedAITrainingPipeline:
         except Exception as e:
             logger.warning(f"Error executing AI decision: {e}")
             return "error"
-    
+
     def calculate_episode_accuracy(self):
         """Calculate threat detection accuracy for the episode"""
         total_actions = (self.training_metrics['successful_intercepts'] + 
@@ -497,16 +535,19 @@ class EnhancedAITrainingPipeline:
                           self.training_metrics['correct_ignores'])
         
         return correct_actions / total_actions
-    
+
     def run_training_episode(self, episode_num: int):
-        """Run training episode with comprehensive tracking"""
+        """FIXED: Enhanced episode with better scenario balancing"""
         logger.info(f"Starting training episode {episode_num}")
         
         try:
-            # Progressive difficulty
-            difficulty_levels = ["easy", "medium", "hard"]
-            difficulty_index = min(episode_num // (self.episodes // len(difficulty_levels)), len(difficulty_levels) - 1)
-            difficulty = difficulty_levels[difficulty_index]
+            # FIXED: More balanced difficulty progression
+            if episode_num < 10:
+                difficulty = "easy"
+            elif episode_num < 30:
+                difficulty = "medium" 
+            else:
+                difficulty = "hard"
             
             # Generate scenario
             ai_scenario = self.ai.generate_realistic_scenario(difficulty)
@@ -521,7 +562,7 @@ class EnhancedAITrainingPipeline:
             episode_reward = 0
             player_vessel_ai = self._convert_player_to_ai_format()
             
-            # Reset episode-specific metrics
+            # Reset episode metrics
             episode_metrics = {
                 'successful_intercepts': 0,
                 'false_positives': 0,
@@ -531,14 +572,15 @@ class EnhancedAITrainingPipeline:
                 'hitl_requests': 0
             }
             
+            # FIXED: Track threat distribution for this episode
+            threat_counts = {"confirmed": 0, "possible": 0, "neutral": 0}
+            
             for step in range(self.steps_per_episode):
                 if self.simulation.game_over:
                     break
                     
-                # Update simulation
                 self.simulation.update_simulation()
                 
-                # Get active vessels
                 active_vessels = [v for v in self.simulation.units 
                                 if v.active and v != self.simulation.player_ship]
                 
@@ -547,27 +589,24 @@ class EnhancedAITrainingPipeline:
                         logger.info("No active vessels, ending episode early")
                     break
                 
-                # AI makes decisions for each vessel
                 for vessel in active_vessels:
                     try:
+                        # Track threat distribution
+                        threat_level = vessel.true_threat_level
+                        threat_counts[threat_level] += 1
+                        
                         vessel_ai_format = self._convert_vessel_to_ai_format({
                             'id': vessel.id, 'x': vessel.x, 'y': vessel.y,
                             'speed': vessel.speed, 'heading': vessel.heading,
                             'vessel_type': vessel.vessel_type,
-                            'true_threat_level': vessel.true_threat_level
+                            'true_threat_level': threat_level
                         })
                         
-                        # Get AI decision
                         ai_report = self.ai.decide_action(vessel_ai_format, player_vessel_ai)
-                        
-                        # Calculate reward
                         reward = self.reward_calculator.calculate_reward(ai_report, vessel, "ai_decision")
                         episode_reward += reward
                         
-                        # Update confidence stats
                         self._update_confidence_stats(ai_report.confidence)
-                        
-                        # Execute decision and track outcome
                         outcome = self.execute_ai_decision(ai_report, vessel)
                         
                         # Update episode metrics
@@ -585,7 +624,7 @@ class EnhancedAITrainingPipeline:
                             episode_metrics['hitl_requests'] += 1
                             episode_metrics['successful_intercepts'] += 1
                         
-                        # Train AI with the experience
+                        # Train AI
                         current_state = self.ai.get_state(vessel_ai_format, player_vessel_ai)
                         action_index = list(AIAction).index(ai_report.recommended_action)
                         
@@ -603,11 +642,16 @@ class EnhancedAITrainingPipeline:
                             logger.warning(f"Error processing vessel {vessel.id}: {e}")
                         continue
             
+            # FIXED: Log threat distribution for analysis
+            total_threats = sum(threat_counts.values())
+            if total_threats > 0:
+                logger.info(f"Threat distribution - Confirmed: {threat_counts['confirmed']}, "
+                           f"Possible: {threat_counts['possible']}, Neutral: {threat_counts['neutral']}")
+            
             # Update global metrics
             for key in episode_metrics:
                 self.training_metrics[key] += episode_metrics[key]
             
-            # Calculate episode accuracy
             episode_accuracy = self.calculate_episode_accuracy()
             self.training_metrics['episode_threat_accuracy'].append(episode_accuracy)
             self.training_metrics['episode_rewards'].append(episode_reward)
@@ -615,7 +659,7 @@ class EnhancedAITrainingPipeline:
             logger.info(f"Episode {episode_num} completed. "
                        f"Reward: {episode_reward:.2f}, "
                        f"Accuracy: {episode_accuracy:.2%}, "
-                       f"Intercepts: {episode_metrics['successful_intercepts']}")
+                       f"Threats: C{threat_counts['confirmed']}/P{threat_counts['possible']}/N{threat_counts['neutral']}")
             
         except Exception as e:
             logger.error(f"Error in training episode {episode_num}: {e}")
@@ -623,9 +667,8 @@ class EnhancedAITrainingPipeline:
             self.training_metrics['episode_threat_accuracy'].append(0.0)
         
         finally:
-            # Clean up for next episode
             self._reset_episode()
-    
+
     def _reset_episode(self):
         """Reset simulation for next episode"""
         try:
@@ -651,7 +694,7 @@ class EnhancedAITrainingPipeline:
             
         except Exception as e:
             logger.warning(f"Error resetting episode: {e}")
-    
+
     def train(self):
         """Enhanced training loop with comprehensive monitoring"""
         print("\n🚀 ENHANCED AI TRAINING PIPELINE")
@@ -701,7 +744,7 @@ class EnhancedAITrainingPipeline:
         
         # Final performance report
         self._print_comprehensive_report()
-    
+
     def _save_checkpoint(self, episode: int):
         """Save training checkpoint"""
         try:
@@ -716,9 +759,29 @@ class EnhancedAITrainingPipeline:
                        
         except Exception as e:
             logger.warning(f"Error saving checkpoint: {e}")
-    
+
+    def _get_ai_performance_report(self):
+        """Safely get AI performance report with error handling"""
+        try:
+            return self.ai.get_performance_report()
+        except Exception as e:
+            logger.warning(f"Error getting AI performance report: {e}")
+            # Return default performance report
+            return {
+                "total_decisions": getattr(self.ai, 'performance_metrics', {}).get('decisions', 0),
+                "hitl_requests": getattr(self.ai, 'performance_metrics', {}).get('hitl_requests', 0),
+                "cumulative_reward": getattr(self.ai, 'performance_metrics', {}).get('cumulative_reward', 0.0),
+                "training_steps": getattr(self.ai, 'train_counter', 0),
+                "current_epsilon": getattr(self.ai, 'epsilon', 0.0),
+                "replay_buffer_size": len(getattr(self.ai, 'replay_buffer', type('obj', (object,), {'memory': []})()).memory),
+                "autonomous_success_rate": "0%",
+                "vessels_generated": getattr(self.ai, 'performance_metrics', {}).get('vessels_generated', 0),
+                "average_training_loss": 0.0,
+                "environment": {}
+            }
+
     def _print_comprehensive_report(self):
-        """Print detailed training report"""
+        """FIXED: Enhanced reporting with robust error handling"""
         print("\n" + "=" * 70)
         print("🎯 ENHANCED AI TRAINING - COMPREHENSIVE REPORT")
         print("=" * 70)
@@ -740,8 +803,12 @@ class EnhancedAITrainingPipeline:
                 self.training_metrics['correct_ignores']
             ])
             
+            # FIXED: Add threat distribution to report
+            threat_breakdown = self.training_metrics['threat_type_breakdown']
+            total_threats = sum(threat_breakdown.values())
+            
             print(f"\n📊 PERFORMANCE METRICS:")
-            print(f"  Episodes Completed: {self.episodes}")
+            print(f"  Episodes Completed: {len(self.training_metrics['episode_rewards'])}")
             print(f"  Average Reward: {avg_reward:7.2f} ± {std_reward:6.2f}")
             print(f"  Threat Detection Accuracy: {avg_accuracy:7.1%}")
             
@@ -756,7 +823,17 @@ class EnhancedAITrainingPipeline:
             if total_actions > 0:
                 intercept_accuracy = self.training_metrics['successful_intercepts'] / max(1, 
                     self.training_metrics['successful_intercepts'] + self.training_metrics['false_positives'])
+                threat_detection_rate = self.training_metrics['successful_intercepts'] / max(1, 
+                    self.training_metrics['successful_intercepts'] + self.training_metrics['missed_threats'])
                 print(f"  Intercept Accuracy:    {intercept_accuracy:7.1%}")
+                print(f"  Threat Detection Rate: {threat_detection_rate:7.1%}")  # NEW METRIC
+            
+            # FIXED: Threat distribution analysis
+            if total_threats > 0:
+                print(f"\n🎯 THREAT DISTRIBUTION:")
+                print(f"  Confirmed Threats: {threat_breakdown['confirmed']:4d} ({threat_breakdown['confirmed']/total_threats:6.1%})")
+                print(f"  Possible Threats:  {threat_breakdown['possible']:4d} ({threat_breakdown['possible']/total_threats:6.1%})")
+                print(f"  Neutral Vessels:   {threat_breakdown['neutral']:4d} ({threat_breakdown['neutral']/total_threats:6.1%})")
             
             # Confidence statistics
             conf_stats = self.training_metrics['confidence_stats']
@@ -767,15 +844,15 @@ class EnhancedAITrainingPipeline:
                 print(f"  Medium Confidence: {conf_stats['medium']:4d} ({conf_stats['medium']/total_conf:6.1%})")
                 print(f"  Low Confidence:    {conf_stats['low']:4d} ({conf_stats['low']/total_conf:6.1%})")
             
-            # AI performance
-            ai_perf = self.ai.get_performance_report()
+            # AI performance - FIXED: Use safe method to get performance report
+            ai_perf = self._get_ai_performance_report()
             print(f"\n🧠 AI ENGINE PERFORMANCE:")
-            print(f"  Total Decisions:       {ai_perf['total_decisions']:6d}")
-            print(f"  Autonomous Rate:       {ai_perf['autonomous_success_rate']:>9}")
-            print(f"  Cumulative Reward:     {ai_perf['cumulative_reward']:7.1f}")
-            print(f"  Training Steps:        {ai_perf['training_steps']:6d}")
-            print(f"  Final Epsilon:         {ai_perf['current_epsilon']:9.4f}")
-            print(f"  Buffer Size:           {ai_perf['replay_buffer_size']:6d}")
+            print(f"  Total Decisions:       {ai_perf.get('total_decisions', 0):6d}")
+            print(f"  Autonomous Rate:       {ai_perf.get('autonomous_success_rate', '0%'):>9}")
+            print(f"  Cumulative Reward:     {ai_perf.get('cumulative_reward', 0.0):7.1f}")
+            print(f"  Training Steps:        {ai_perf.get('training_steps', 0):6d}")
+            print(f"  Final Epsilon:         {ai_perf.get('current_epsilon', 0.0):9.4f}")
+            print(f"  Buffer Size:           {ai_perf.get('replay_buffer_size', 0):6d}")
             
             # Learning progression
             if len(self.training_metrics['episode_rewards']) > 10:
@@ -783,6 +860,12 @@ class EnhancedAITrainingPipeline:
                 last_10_avg = np.mean(self.training_metrics['episode_rewards'][-10:])
                 improvement = last_10_avg - first_10_avg
                 print(f"  Reward Improvement:    {improvement:7.1f}")
+                
+                # FIXED: Add performance trend analysis
+                if improvement > 0:
+                    print(f"  📈 Performance Trend:   Improving")
+                else:
+                    print(f"  📉 Performance Trend:   Declining - NEEDS ATTENTION")
             
         except Exception as e:
             print(f"Error generating report: {e}")
