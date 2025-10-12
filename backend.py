@@ -3,7 +3,7 @@ backend.py - Enhanced with UI interaction methods and FIXED dynamic zone managem
 
 FIXED: Proper zone expansion/shrinking, boundary enforcement, and vessel spawning
 """
-
+from ai import NavalAI
 import math
 import random
 import time
@@ -247,6 +247,7 @@ class SimulationController:
         self.mission_type = mission_type
         self.difficulty = difficulty
         self.player_data = player_data or {}
+        self.ai_controller = NavalAI()
 
         self.fleet = FleetManager(region_size=(800.0, 600.0))
         self.status_log: List[str] = []
@@ -572,6 +573,29 @@ class SimulationController:
                v.y, v.vy = y_min, abs(v.vy)
             elif v.y > y_max:
                 v.y, v.vy = y_max, -abs(v.vy)
+
+            # --- AI BOUNDARY SIMULATION UPDATE ---
+        zone = self.zone_rect
+        x_min, x_max = zone["x"], zone["x"] + zone["width"]
+        y_min, y_max = zone["y"], zone["y"] + zone["height"]
+        region_bounds = (x_min, x_max, y_min, y_max)
+
+        # Build simple vessel dicts for AI movement handling
+        vessels = [
+            {"x": v.x, "y": v.y, "vx": v.vx, "vy": v.vy, "speed": np.hypot(v.vx, v.vy),
+            "heading": np.degrees(np.arctan2(v.vy, v.vx)), "vessel_type": v.vessel_type}
+            for v in self.units if v.active and v is not self.player_ship
+        ]
+
+# Let AI simulate random motion and bounding (keeps within red region)
+        self.ai_controller.update_vessel_positions(vessels, region_bounds)
+
+# Push results back to actual vessels
+        for v_dict, vessel in zip(vessels, [u for u in self.units if u.active and u is not self.player_ship]):
+            vessel.x = v_dict["x"]
+            vessel.y = v_dict["y"]
+            vessel.vx = v_dict["vx"]
+            vessel.vy = v_dict["vy"]
 
 
     def respond_to_communication(self, vessel_id: int, player_message: str) -> str:

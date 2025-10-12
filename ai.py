@@ -685,6 +685,100 @@ class NavalAI:
         except Exception as e:
             logger.error(f"Error in NPC behavior control: {e}")
             return 0.0, 0.0
+            # ------------------------------------------------------------------
+    # REGION-BOUND VESSEL MOVEMENT & COMMUNICATION SIMULATION
+    # ------------------------------------------------------------------
+    def simulate_spawn_within_region(self, count: int, region_bounds: Tuple[float, float, float, float]) -> List[Dict]:
+        """
+        Generate 'count' vessels with random positions and directions inside the given region bounds.
+        """
+        x_min, x_max, y_min, y_max = region_bounds
+        vessels = []
+
+        for _ in range(count):
+            x = random.uniform(x_min, x_max)
+            y = random.uniform(y_min, y_max)
+            speed = random.uniform(0.5, 2.0)
+            heading = random.uniform(0, 360)
+            vx = math.cos(math.radians(heading)) * speed
+            vy = math.sin(math.radians(heading)) * speed
+            threat = random.choices(["neutral", "possible", "confirmed"], weights=[0.6, 0.25, 0.15])[0]
+
+            vessels.append({
+                "x": x,
+                "y": y,
+                "vx": vx,
+                "vy": vy,
+                "speed": speed,
+                "heading": heading,
+                "true_threat_level": threat,
+                "vessel_type": random.choice(["Fishing Boat", "Cargo Ship", "Patrol Craft", "Speedboat"]),
+                "crew_count": random.randint(2, 25),
+                "id": f"ai_sim_{random.randint(1000,9999)}"
+            })
+        return vessels
+
+
+    def update_vessel_positions(self, vessels: List[Dict], region_bounds: Tuple[float, float, float, float], dt: float = 1.0):
+        """
+        Update positions of vessels while keeping them within region bounds.
+        """
+        x_min, x_max, y_min, y_max = region_bounds
+        for v in vessels:
+            v["x"] += v["vx"] * dt
+            v["y"] += v["vy"] * dt
+
+            # Boundary reflection
+            if v["x"] < x_min:
+                v["x"] = x_min
+                v["vx"] = abs(v["vx"])
+            elif v["x"] > x_max:
+                v["x"] = x_max
+                v["vx"] = -abs(v["vx"])
+            if v["y"] < y_min:
+                v["y"] = y_min
+                v["vy"] = abs(v["vy"])
+            elif v["y"] > y_max:
+                v["y"] = y_max
+                v["vy"] = -abs(v["vy"])
+
+            # Random small direction change
+            if random.random() < 0.05:
+                delta = random.uniform(-10, 10)
+                new_heading = (v["heading"] + delta) % 360
+                v["heading"] = new_heading
+                v["vx"] = math.cos(math.radians(new_heading)) * v["speed"]
+                v["vy"] = math.sin(math.radians(new_heading)) * v["speed"]
+
+
+    def simulate_random_communication(self, vessel: Dict) -> str:
+        """
+        AI randomly decides what type of response to send when hailed.
+        Overrides backend message with more dynamic flavor.
+        """
+        threat = vessel.get("true_threat_level", "neutral")
+        vessel_type = vessel.get("vessel_type", "Unknown")
+
+        if threat == "confirmed":
+            responses = [
+                f"{vessel_type}: Stand down or face retaliation!",
+                "[Silence]",
+                "Weapons systems online. Do not approach.",
+                "Aggressive radio jamming detected."
+            ]
+        elif threat == "possible":
+            responses = [
+                f"{vessel_type}: Uh... we are just fishing, over.",
+                f"{vessel_type}: Please repeat, poor connection.",
+                "Unclear communication. Might be stalling..."
+            ]
+        else:
+            responses = [
+                f"{vessel_type}: Copy that, patrol. Standing by.",
+                f"{vessel_type}: Routine operation, nothing suspicious.",
+                "All systems normal here, patrol."
+            ]
+        return random.choice(responses)
 
     def _enhanced_civilian_behavior(self, vessel: Dict, distance: float, player_pos: Tuple[float, float]) -> Tuple[float, float]:
         """Enhanced civilian behavior with awareness."""
