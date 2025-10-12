@@ -270,7 +270,7 @@ class SimulationController:
         self.patrol_phase_active: bool = True
 
         # player vessel: create and register via fleet
-        self.player_ship = Vessel(id=0, vessel_type="Player Vessel", x=100.0, y=100.0, vx=0.0, vy=0.0, speed=2.0)
+        self.player_ship = Vessel(id=0, vessel_type="Player Vessel", x=100.0, y=100.0, vx=0.0, vy=0.0, speed=4.0)
         self.fleet.register_vessel(self.player_ship)
 
         # units is an ordered list used throughout UI (player first)
@@ -824,23 +824,31 @@ class SimulationController:
 
     # --- Replace intercept_vessel with this corrected version ---
     def intercept_vessel(self) -> Tuple[bool, Optional[str], str]:
-        """Intercept action: remove target and return (was_correct, true_threat_level, message)."""
+        """
+        Intercept a selected vessel.
+        Removes hostile (confirmed) vessels and logs 'Threat eliminated'.
+        """
         if not self.selected_unit:
             return False, None, "No vessel selected."
+
         target = self.selected_unit
-        was_correct = (target.true_threat_level == "confirmed")
-        message = f"Intercept action taken on {target.vessel_type} (id={target.id}). Actual: {target.true_threat_level}."
-        # soft-remove
-        target.active = False
-        self.add_log(message)
-        # if we intercepted a vessel that was spawned in this expanded region, remove from tracking
-        if target.id in self._spawned_ids:
-            try:
-                self._spawned_ids.remove(target.id)
-            except ValueError:
-                pass
+        # Inside range check handled in UI
+        was_hostile = (target.true_threat_level == "confirmed")
+
+        if was_hostile:
+            target.active = False
+            log_msg = f"⚠️ Threat eliminated: {target.vessel_type} (ID: {target.id})"
+            self.add_log(log_msg)
+            report_msg = "Threat eliminated."
+        else:
+            log_msg = f"Intercepted non-hostile vessel {target.vessel_type} (ID: {target.id})"
+            self.add_log(log_msg)
+            report_msg = "No threat detected – vessel secured."
+
+        # clear selection
         self.selected_unit = None
-        return was_correct, target.true_threat_level, message
+        return was_hostile, target.true_threat_level, report_msg
+
 
     # --- Replace mark_safe / mark_threat with cleaned-up versions ---
     def mark_safe(self) -> Tuple[bool, Optional[str], str]:

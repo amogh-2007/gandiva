@@ -981,41 +981,19 @@ CREW: {unit.crew_count}
             self.status_label.setText("Target out of interception range. Move closer.")
             return
             
-        threat_assessment = "Unknown"
-        confidence = 0.0
-        if hasattr(self.controller, 'ai_initialized') and self.controller.ai_initialized:
-            try:
-                player_data = self.controller._convert_player_to_ai_format()
-                vessel_data = self.controller._convert_vessel_to_ai_format({
-                    'id': target.id, 'x': target.x, 'y': target.y,
-                    'speed': target.speed, 'heading': target.heading,
-                    'vessel_type': target.vessel_type,
-                    'true_threat_level': target.true_threat_level
-                })
-                ai_report = self.controller.ai.decide_action(vessel_data, player_data)
-                threat_assessment = ai_report.recommended_action.value
-                confidence = ai_report.confidence
-            except Exception as e:
-                logger.warning(f"AI analysis failed during interception: {e}")
-        
-        result = self.controller.intercept_vessel(target.id)
-        
-        if result['success']:
-            status = f"Intercepted {target.vessel_type}\n"
-            status += f"Threat Assessment: {threat_assessment}\n"
-            if confidence > 0:
-                status += f"AI Confidence: {confidence:.1%}"
-            self.status_label.setText(status)
-            
-            self.intercept_btn.setEnabled(False)
-            self.mark_safe_btn.setEnabled(True)
-            self.mark_threat_btn.setEnabled(True)
-            
-            if confidence > 0.8 and threat_assessment == "THREAT":
-                self.distress_btn.setEnabled(True)
-                self.distress_status.setText("WARNING: High threat detected - Distress available")
+               # Perform backend intercept
+        success, true_threat_level, message = self.controller.intercept_vessel()
+
+        # Update UI / log
+        if success:
+            self.status_label.setText("✅ " + message)
+            self.details_label.setText(f"Target neutralized – {true_threat_level.upper()}")
         else:
-            self.status_label.setText(f"Interception failed: {result['message']}")
+            self.status_label.setText("🛈 " + message)
+            self.details_label.setText(f"No hostile activity detected ({true_threat_level}).")
+
+        # Refresh display and counts
+        self.update_display()
 
     def update_display(self):
         """FIXED: Update radar display - RED BOX ALWAYS VISIBLE and expands/shrinks"""
