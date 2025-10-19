@@ -21,11 +21,13 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 
-import database
+# Use distinct alias for DB module to avoid name shadowing with adapter instance
+import database as db
 
 class AIDatabase:
     def get_boat(self, vessel_id):
-        vessel_data = database.get_vessel(vessel_id)
+        # Fetch from the real database module
+        vessel_data = db.get_vessel(vessel_id)
         if vessel_data:
             return vessel_data
         else:
@@ -39,8 +41,8 @@ class AIDatabase:
             }
     
     def get_sim_state(self, player_id):
-        # Get player vessel from database or return default
-        player_vessels = [v for v in database.load_vessels() if v.get('vessel_type') == 'Player Vessel']
+        # Get player vessel from the DB or return default
+        player_vessels = [v for v in db.load_vessels() if v.get('vessel_type') == 'Player Vessel']
         if player_vessels:
             return player_vessels[0]
         else:
@@ -52,6 +54,7 @@ class AIDatabase:
                 "id": "player_1"
             }
 
+# Provide an adapter instance for convenience in this module's tests
 database = AIDatabase()
 
 # --- Enhanced Deep Learning Framework ---
