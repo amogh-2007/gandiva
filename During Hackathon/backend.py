@@ -264,6 +264,11 @@ class SimulationController:
         self.zone_rect = {"x": 300, "y": 200, "width": 200, "height": 200}
         # keep a copy of the original rect so we can expand/collapse correctly
         self.zone_rect_original = dict(self.zone_rect)
+        # expose original zone fields for legacy helpers that reference attributes
+        self.original_x = float(self.zone_rect_original["x"])
+        self.original_y = float(self.zone_rect_original["y"])
+        self.original_width = float(self.zone_rect_original["width"])
+        self.original_height = float(self.zone_rect_original["height"])
         self.zone_rect_expanded: Optional[Dict[str, float]] = None
         self.zone_expanded: bool = False
 
